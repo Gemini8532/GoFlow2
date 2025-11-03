@@ -2,6 +2,7 @@ package main
 
 import (
 	"example/goflow/flow"
+	"flag"
 	"fmt"
 	"image/png"
 	"log"
@@ -9,29 +10,29 @@ import (
 )
 
 func main() {
-	// Updated usage: output path is first, followed by all image frames.
-	if len(os.Args) < 4 {
-		fmt.Println("Usage: go run . <output.png> <frame1.png> <frame2.png> [frame3.png ...]")
+	// Define and parse command-line flags
+	outputPath := flag.String("output", "output_flow_map.png", "Path to save the output flow map image.")
+	resolutionFactor := flag.Int("resolution-factor", 4, "The factor by which to downscale the images before processing.")
+	flag.Parse()
+
+	imagePaths := flag.Args()
+
+	if len(imagePaths) < 2 {
+		fmt.Println("Usage: go run . [flags] <frame1.png> <frame2.png> [frame3.png ...]")
+		flag.PrintDefaults()
 		os.Exit(1)
 	}
-
-	outputPath := os.Args[1]
-	imagePaths := os.Args[2:]
-
-	// Define the downscaling factor.
-	// 4 will reduce 1024x1024 to 256x256.
-	const resolutionFactor = 4
 
 	log.Printf("Starting average optical flow generation for %d frames...\n", len(imagePaths))
 
 	// Call the module's new function
-	img, err := flow.GenerateAverageFlowMap(imagePaths, resolutionFactor)
+	img, err := flow.GenerateAverageFlowMap(imagePaths, *resolutionFactor)
 	if err != nil {
 		log.Fatalf("Error generating flow map: %v", err)
 	}
 
 	// Save the resulting image to the output path
-	file, err := os.Create(outputPath)
+	file, err := os.Create(*outputPath)
 	if err != nil {
 		log.Fatalf("Error creating output file: %v", err)
 	}
@@ -41,5 +42,5 @@ func main() {
 		log.Fatalf("Error encoding image: %v", err)
 	}
 
-	log.Printf("Successfully generated average flow map: %s\n", outputPath)
+	log.Printf("Successfully generated average flow map: %s\n", *outputPath)
 }
