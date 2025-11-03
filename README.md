@@ -3,7 +3,7 @@
 This module uses the Lucas-Kanade algorithm (via `gocv`) to predict optical flow
 by tracking features across a series of rainfall images.
 
-## ⚠️ Important Dependency: OpenCV
+## Important Dependency: OpenCV
 
 This module requires `gocv`, which in turn requires the native OpenCV (C++)
 libraries to be installed on your system.
@@ -13,8 +13,12 @@ If you're on a Debian-based Linux distribution (like Ubuntu), you can install th
 ```bash
 # Install OpenCV and its dependencies
 sudo apt-get update
-sudo apt-get install -y libopencv-dev opencv-contrib
+sudo apt-get install -y libopencv-dev
 ```
+
+### `gocv` Compatibility
+
+Note that the version of `gocv` used in this project (`v0.31.0`) is known to be compatible with OpenCV `4.6.0`, which is the version typically available through `apt` on recent Ubuntu distributions. If you have a different version of OpenCV installed, you may need to adjust the `gocv` version in `go.mod`.
 
 ## How to Run
 
@@ -39,11 +43,14 @@ sudo apt-get install -y libopencv-dev opencv-contrib
 ## Command-Line Flags
 
 -   `-output <path>`: The path to save the output flow map image. (Default: `output_flow_map.png`)
--   `-resolution-factor <int>`: The factor by which to downscale the images before processing. (Default: `4`)
+-   `-resolution-factor <int>`: The factor by which to downscale the final output image. (Default: `4`)
 
 ## Module Structure
 
 -   `go.mod`: Defines the module and its `gocv` dependency.
 -   `cmd/main.go`: The main executable for running the flow prediction.
--   `flow/lk.go`: The core package containing the optical flow logic.
+-   `flow/`: The core package containing the optical flow logic.
+  - `lk.go`: Sparse feature tracking.
+  - `denseflow.go`: Dense flow map generation.
+  - `visualize.go`: Visualization utility functions.
 -   `rainfall_data/`: A directory containing sample rainfall data.
