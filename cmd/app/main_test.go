@@ -12,7 +12,7 @@ func TestForwardOpticalFlow(t *testing.T) {
 	image1Path := "../rainfall_data/2025-10-03T14:40:00Z.png"
 	image2Path := "../rainfall_data/2025-10-03T14:45:00Z.png"
 	image3Path := "../rainfall_data/2025-10-03T14:50:00Z.png"
-	
+
 	for _, path := range []string{image1Path, image2Path, image3Path} {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			t.Skipf("Required test image does not exist: %s", path)
@@ -24,7 +24,7 @@ func TestForwardOpticalFlow(t *testing.T) {
 
 	// Step 1: Generate flow map from image 1 to image 2 (at lower resolution)
 	flowMapPath := "test_flow_map.png"
-	
+
 	err1 := RunFlowGeneration([]string{image1Path, image2Path}, resolutionFactor, flowMapPath)
 	if err1 != nil {
 		t.Fatalf("Failed to generate flow map: %v", err1)
@@ -78,7 +78,7 @@ func TestForwardOpticalFlowArgs(t *testing.T) {
 	image1Path := "../rainfall_data/2025-10-03T14:40:00Z.png"
 	image2Path := "../rainfall_data/2025-10-03T14:45:00Z.png"
 	image3Path := "../rainfall_data/2025-10-03T14:50:00Z.png"
-	
+
 	for _, path := range []string{image1Path, image2Path, image3Path} {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			t.Skipf("Required test image does not exist: %s", path)
@@ -87,7 +87,7 @@ func TestForwardOpticalFlowArgs(t *testing.T) {
 
 	// Step 1: Generate flow map from image 1 to image 2 using command line arguments
 	flowMapPath := "test_flow_map_args.png"
-	
+
 	args1 := []string{"-output", flowMapPath, "-resolution-factor", "4", image1Path, image2Path}
 	err1 := runMainWithArgs(args1)
 	if err1 != nil {
@@ -96,7 +96,7 @@ func TestForwardOpticalFlowArgs(t *testing.T) {
 
 	// Step 2: Apply forward transformation to the full resolution image 2 using command line arguments
 	outputPath := "forward_result_args.png"
-	
+
 	args2 := []string{"-forward", "-forward-input-image", image2Path, "-forward-output-image", outputPath, flowMapPath}
 	err2 := runMainWithArgs(args2)
 	if err2 != nil {

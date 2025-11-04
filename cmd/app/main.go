@@ -23,7 +23,7 @@ func RunMain(args []string) error {
 	if len(args) < 1 {
 		return fmt.Errorf("not enough arguments provided")
 	}
-	
+
 	// Since flag.Parse() uses os.Args directly, we need to temporarily modify os.Args
 	// We'll create a new approach using a custom flag set for testing
 	return runMainWithArgs(args[1:]) // Skip the program name
