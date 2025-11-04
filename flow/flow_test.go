@@ -109,8 +109,8 @@ func TestShiftedFlow(t *testing.T) {
 	}
 }
 
-// TestReverseFlow checks that applying a calculated flow map in reverse can reconstruct the original image.
-func TestReverseFlow(t *testing.T) {
+// TestForwardFlow checks that applying a calculated flow map in forward can reconstruct the original image.
+func TestForwardFlow(t *testing.T) {
 	imageAPath := "../test_data/centered.png"
 	imageBPath := "../test_data/shifted.png"
 	resolutionFactor := 4
@@ -132,7 +132,7 @@ func TestReverseFlow(t *testing.T) {
 	if err := png.Encode(flowMapFile, flowMap); err != nil {
 		t.Fatalf("Failed to encode flow map: %v", err)
 	}
-	flowMapFile.Close() // Close the file so ReverseTransform can open it
+	flowMapFile.Close() // Close the file so ForwardTransform can open it
 
 	// 3. Resize image B to match the flow map dimensions and save to a temp file
 	imgB, err := resizeImage(imageBPath, scaledWidth, scaledHeight)
@@ -149,10 +149,10 @@ func TestReverseFlow(t *testing.T) {
 	}
 	imgBFile.Close()
 
-	// 4. Run the reverse transform
-	reversedImage, err := ReverseTransform(imgBFile.Name(), flowMapFile.Name(), 1.0)
+	// 4. Run the forward transform
+	forwardedImage, err := ForwardTransform(imgBFile.Name(), flowMapFile.Name(), 1.0)
 	if err != nil {
-		t.Fatalf("ReverseTransform failed: %v", err)
+		t.Fatalf("ForwardTransform failed: %v", err)
 	}
 
 	// 5. Load and resize image A to compare against the result
@@ -162,7 +162,7 @@ func TestReverseFlow(t *testing.T) {
 	}
 
 	// 6. Compare the images with a tolerance for minor artifacts
-	compareImages(t, expectedImage, reversedImage, 1500) // Allow up to 1500 pixels to be different
+	compareImages(t, expectedImage, forwardedImage, 1500) // Allow up to 1500 pixels to be different
 }
 
 // TestSymmetricFlow checks that the flow from A->B is the negative of the flow from B->A.
