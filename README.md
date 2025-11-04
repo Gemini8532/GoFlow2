@@ -20,6 +20,14 @@ sudo apt-get install -y libopencv-dev
 
 Note that the version of `gocv` used in this project (`v0.31.0`) is known to be compatible with OpenCV `4.6.0`, which is the version typically available through `apt` on recent Ubuntu distributions. If you have a different version of OpenCV installed, you may need to adjust the `gocv` version in `go.mod`.
 
+This is only partially true - the version in ubuntu 22.04 is  4.5.4, this seems to be incompatible....
+I built 4.6.0 from scratch and installed it and it didn't work with v0.31.0 - but did with v0.30.0...
+Then I tried building the versoin of opencv in v0.31.0 from /home/jdp/go/pkg/mod/gocv.io/x/gocv@v0.31.0/
+the make install failed because libdc1394-22-dev is not available - so I edited the Makefile to use libdc1394-dev and make install worked...
+v0.31.0 now works
+
+I got jules to test whether v0.30.0 works with the version of opencv in ubuntu 24.4 and it does - so that would have been an alternative
+
 ## How to Run
 
 1.  **Install Dependencies:** Make sure Go and OpenCV are installed on your system.
