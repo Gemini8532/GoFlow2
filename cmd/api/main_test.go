@@ -145,3 +145,90 @@ func TestFlowHandler(t *testing.T) {
 		t.Errorf("Transformed image is not more similar to the 3rd image. MSE Transformed vs 3: %f, MSE 2 vs 3: %f", mseTransformedVs3, mse2Vs3)
 	}
 }
+
+func TestTraceHandler(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get working directory: %v", err)
+	}
+	if err := os.Chdir("../.."); err != nil {
+		t.Fatalf("Failed to change directory to project root: %v", err)
+	}
+	defer os.Chdir(wd)
+
+	imagePath := "rainfall_data/2025-10-03T14:40:00Z.png"
+	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
+		t.Fatalf("Required test image does not exist: %s", imagePath)
+	}
+
+	requestBody, _ := json.Marshal(map[string]interface{}{
+		"image_path": imagePath,
+		"origin": map[string]float64{
+			"X": 10,
+			"Y": 10,
+		},
+		"direction": map[string]float64{
+			"X": 1,
+			"Y": 0,
+		},
+		"fov_deg":  10,
+		"distance": 100,
+	})
+	req, err := http.NewRequest("POST", "/trace", bytes.NewBuffer(requestBody))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(traceHandler)
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	if contentType := rr.Header().Get("Content-Type"); contentType != "application/json" {
+		t.Errorf("handler returned wrong content type: got %v want %v", contentType, "application/json")
+	}
+
+	var respBody map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&respBody); err != nil {
+		t.Fatalf("Failed to decode response body as JSON: %v", err)
+	}
+
+	if _, ok := respBody["projection"]; !ok {
+		t.Error("response body does not contain 'projection' field")
+	}
+
+	if _, ok := respBody["triangle"]; !ok {
+		t.Error("response body does not contain 'triangle' field")
+	}
+}
+
+func TestTraceHandler_InvalidPath(t *testing.T) {
+	requestBody, _ := json.Marshal(map[string]interface{}{
+		"image_path": "../../../../etc/passwd",
+		"origin": map[string]float64{
+			"X": 10,
+			"Y": 10,
+		},
+		"direction": map[string]float64{
+			"X": 1,
+			"Y": 0,
+		},
+		"fov_deg":  10,
+		"distance": 100,
+	})
+	req, err := http.NewRequest("POST", "/trace", bytes.NewBuffer(requestBody))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(traceHandler)
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusBadRequest)
+	}
+}
