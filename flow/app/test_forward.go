@@ -30,10 +30,10 @@ func resizeImage(imgPath string, width, height int) (image.Image, error) {
 }
 
 func main() {
-	// Define the paths for the three images
-	image1Path := "rainfall_data/2025-10-03T14:40:00Z.png"
-	image2Path := "rainfall_data/2025-10-03T14:45:00Z.png"
-	image3Path := "rainfall_data/2025-10-03T14:50:00Z.png"
+	// Define the paths for the three images - need to go up 2 directories to reach rainfall_data
+	image1Path := "../../rainfall_data/2025-10-03T14:40:00Z.png"
+	image2Path := "../../rainfall_data/2025-10-03T14:45:00Z.png"
+	image3Path := "../../rainfall_data/2025-10-03T14:50:00Z.png"
 
 	// Check if files exist
 	for _, path := range []string{image1Path, image2Path, image3Path} {

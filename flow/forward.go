@@ -1,9 +1,9 @@
 package flow
 
 import (
-	"image/color"
 	"fmt"
 	"image"
+	"image/color"
 	"math"
 
 	"gocv.io/x/gocv"
@@ -51,9 +51,9 @@ func ForwardTransform(inputImagePath, flowMapPath string, factor float64) (image
 			// Get the flow vector from the processed flow map
 			bgr := processedFlowMat.GetVecbAt(y, x)
 			// The flow is encoded in R and G channels (B is unused)
-			r8 := uint8(bgr[2])  // Red channel
-			g8 := uint8(bgr[1])  // Green channel
-			
+			r8 := uint8(bgr[2]) // Red channel
+			g8 := uint8(bgr[1]) // Green channel
+
 			// Reverse the encoding formula to get the displacement vector
 			dx := (float64(r8) - FlowMidLevel) / FlowScaleFactor
 			dy := (float64(g8) - FlowMidLevel) / FlowScaleFactor
@@ -83,7 +83,7 @@ func ForwardTransform(inputImagePath, flowMapPath string, factor float64) (image
 
 			// Get the color from the input Mat
 			srcBGR := inputMat.GetVecbAt(finalSrcY, finalSrcX)
-			srcR, srcG, srcB := srcBGR[2], srcBGR[1], srcBGR[0]  // BGR to RGB conversion
+			srcR, srcG, srcB := srcBGR[2], srcBGR[1], srcBGR[0] // BGR to RGB conversion
 
 			// Check if the source pixel has zero value (black), which should be transparent
 			// If all RGB values are 0, this represents a transparent pixel
