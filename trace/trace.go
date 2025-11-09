@@ -7,6 +7,15 @@
 // 1. Constructs a triangular search region based on origin, direction, angle, and distance
 // 2. Rasterizes the triangle to determine which pixels are inside it
 // 3. Projects those pixel values along the specified direction using maximum projection
+//
+// The package works well with paletted images (such as those in rainfall_data) by treating
+// palette indices as numeric values. For example, in paletted rainfall images, each pixel
+// value represents an index into a color palette where each index corresponds to a specific
+// rainfall intensity level. The trace algorithm preserves these original indices rather than
+// converting them to RGB values, maintaining the semantic meaning of the original data.
+//
+// For paletted images, a helper function LoadPalettedImageFromRaw() is provided in
+// palette_image.go to properly extract the palette indices as float64 values.
 
 package trace
 
