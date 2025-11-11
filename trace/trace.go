@@ -37,9 +37,9 @@ type Triangle struct {
 }
 
 // ProjectAngularSearch performs an angular search of an image using a triangular region.
-// It creates a triangle with the apex at 'origin', pointing in 'direction' with 
+// It creates a triangle with the apex at 'origin', pointing in 'direction' with
 // a field of view specified by 'fieldOfViewAngleRadians' and extending to 'distance'.
-// It then rasterizes this triangle and projects the pixel values inside it 
+// It then rasterizes this triangle and projects the pixel values inside it
 // along the specified direction using maximum projection to create a 1D profile.
 //
 // Parameters:

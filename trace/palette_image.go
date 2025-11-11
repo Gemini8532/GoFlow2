@@ -35,13 +35,13 @@ func LoadPalettedImageRaw(filename string) ([][]float64, error) {
 	bounds := paletted.Bounds()
 	width := bounds.Dx()
 	height := bounds.Dy()
-	
+
 	// Create a 2D array to hold the palette indices as float64 values
 	image := make([][]float64, height)
 	for y := 0; y < height; y++ {
 		image[y] = make([]float64, width)
 	}
-	
+
 	// Fill the array with palette indices
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
@@ -50,7 +50,7 @@ func LoadPalettedImageRaw(filename string) ([][]float64, error) {
 			image[y][x] = float64(index)
 		}
 	}
-	
+
 	return image, nil
 }
 
@@ -74,19 +74,19 @@ func LoadPalettedImageFromRaw(filename string) ([][]float64, error) {
 		bounds := paletted.Bounds()
 		width := bounds.Dx()
 		height := bounds.Dy()
-		
+
 		imageData := make([][]float64, height)
 		for y := 0; y < height; y++ {
 			imageData[y] = make([]float64, width)
 		}
-		
+
 		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 			for x := bounds.Min.X; x < bounds.Max.X; x++ {
 				index := paletted.ColorIndexAt(x, y)
 				imageData[y][x] = float64(index)
 			}
 		}
-		
+
 		return imageData, nil
 	}
 
@@ -94,18 +94,18 @@ func LoadPalettedImageFromRaw(filename string) ([][]float64, error) {
 	bounds := img.Bounds()
 	width := bounds.Dx()
 	height := bounds.Dy()
-	
+
 	imageData := make([][]float64, height)
 	for y := 0; y < height; y++ {
 		imageData[y] = make([]float64, width)
 	}
-	
+
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			r, _, _, _ := img.At(x, y).RGBA()
 			imageData[y][x] = float64(r >> 8) // Use red channel as example
 		}
 	}
-	
+
 	return imageData, nil
 }

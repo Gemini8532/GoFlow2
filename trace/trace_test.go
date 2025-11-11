@@ -26,7 +26,7 @@ func TestProjectAngularSearch(t *testing.T) {
 	// Test case 1: Search along the diagonal direction (should find all diagonal values if distance is sufficient)
 	t.Run("DiagonalSearch", func(t *testing.T) {
 		direction := Point{X: 1, Y: 1} // Diagonal direction
-		distance := 7.0 // Sufficient to cover the full diagonal (sqrt(2)*5 ≈ 7.07)
+		distance := 7.0                // Sufficient to cover the full diagonal (sqrt(2)*5 ≈ 7.07)
 
 		projection, _, err := ProjectAngularSearch(image, origin, direction, fieldOfViewAngleRadians, distance)
 		if err != nil {
@@ -44,7 +44,7 @@ func TestProjectAngularSearch(t *testing.T) {
 				highValueCount++
 			}
 		}
-		
+
 		// We expect at least as many high values as there are diagonal elements
 		if highValueCount < diagonalLength {
 			t.Errorf("Expected at least %d high values in diagonal search, got %d", diagonalLength, highValueCount)
@@ -69,7 +69,7 @@ func TestProjectAngularSearch(t *testing.T) {
 				highValueCount++
 			}
 		}
-		
+
 		// Perpendicular search through diagonal should find at least one high value
 		if highValueCount == 0 {
 			t.Error("Expected to find at least one high value in perpendicular search intersecting diagonal")
@@ -81,8 +81,8 @@ func TestProjectAngularSearch(t *testing.T) {
 		// Search in a direction away from the diagonal region
 		// Start from a position that clearly avoids the diagonal
 		originOffset := Point{X: 7, Y: 2} // Start from a position far from the diagonal
-		direction := Point{X: 0, Y: 1} // Straight down
-		
+		direction := Point{X: 0, Y: 1}    // Straight down
+
 		distance := 5.0
 
 		projection, _, err := ProjectAngularSearch(image, originOffset, direction, fieldOfViewAngleRadians, distance)
@@ -97,7 +97,7 @@ func TestProjectAngularSearch(t *testing.T) {
 				highValueCount++
 			}
 		}
-		
+
 		// Downward search from offset position should not intersect diagonal values
 		if highValueCount > 0 {
 			t.Errorf("Expected no high values in offset direction, but found %d", highValueCount)
@@ -107,7 +107,7 @@ func TestProjectAngularSearch(t *testing.T) {
 	// Test case 4: Search with insufficient distance (should find fewer diagonal values)
 	t.Run("ShortDistanceSearch", func(t *testing.T) {
 		direction := Point{X: 1, Y: 1} // Diagonal direction
-		shortDistance := 2.0 // Shorter distance, should hit fewer diagonal points
+		shortDistance := 2.0           // Shorter distance, should hit fewer diagonal points
 
 		projection, _, err := ProjectAngularSearch(image, origin, direction, fieldOfViewAngleRadians, shortDistance)
 		if err != nil {
@@ -120,7 +120,7 @@ func TestProjectAngularSearch(t *testing.T) {
 				highValueCount++
 			}
 		}
-		
+
 		// With shorter distance, we might find fewer values
 		if highValueCount > diagonalLength {
 			t.Errorf("Expected fewer high values with short distance, got %d", highValueCount)
@@ -167,7 +167,7 @@ func TestProjectTriangleMax(t *testing.T) {
 		V2: Point{X: 3, Y: 1},
 		V3: Point{X: 2, Y: 3},
 	}
-	
+
 	// Use a direction vector pointing right (X direction)
 	dirUnitVec := Point{X: 1, Y: 0}
 
@@ -252,7 +252,7 @@ func TestPaletteImageSupport(t *testing.T) {
 	// Test 1: Diagonal search that should follow the main diagonal
 	t.Run("DiagonalSearchOnPaletteImage", func(t *testing.T) {
 		origin := Point{X: 0, Y: 0}
-		direction := Point{X: 1, Y: 1} // Diagonal direction
+		direction := Point{X: 1, Y: 1}          // Diagonal direction
 		fieldOfViewAngleRadians := math.Pi / 18 // 10 degrees
 		distance := 20.0
 
@@ -270,7 +270,7 @@ func TestPaletteImageSupport(t *testing.T) {
 				break
 			}
 		}
-		
+
 		if !foundHighValue {
 			t.Error("Expected to find high values (7.0) from diagonal in projection")
 		}
@@ -278,8 +278,8 @@ func TestPaletteImageSupport(t *testing.T) {
 
 	// Test 2: Horizontal search for the horizontal rainfall bands
 	t.Run("HorizontalSearchOnPaletteImage", func(t *testing.T) {
-		origin := Point{X: 5, Y: 5}  // Starting at row 5 where we have level 5 rainfall
-		direction := Point{X: 1, Y: 0} // Horizontal direction
+		origin := Point{X: 5, Y: 5}             // Starting at row 5 where we have level 5 rainfall
+		direction := Point{X: 1, Y: 0}          // Horizontal direction
 		fieldOfViewAngleRadians := math.Pi / 36 // 5 degrees
 		distance := 10.0
 
@@ -296,7 +296,7 @@ func TestPaletteImageSupport(t *testing.T) {
 				break
 			}
 		}
-		
+
 		if !foundLevel5 {
 			t.Error("Expected to find level 5 values in horizontal search")
 		}
@@ -304,8 +304,8 @@ func TestPaletteImageSupport(t *testing.T) {
 
 	// Test 3: Verify that original index values are preserved in the projection
 	t.Run("OriginalValuesPreserved", func(t *testing.T) {
-		origin := Point{X: 0, Y: 10}  // Near row 10 where we have level 3 rainfall
-		direction := Point{X: 1, Y: 0} // Horizontal direction
+		origin := Point{X: 0, Y: 10}            // Near row 10 where we have level 3 rainfall
+		direction := Point{X: 1, Y: 0}          // Horizontal direction
 		fieldOfViewAngleRadians := math.Pi / 12 // 15 degrees
 		distance := 15.0
 
@@ -322,7 +322,7 @@ func TestPaletteImageSupport(t *testing.T) {
 				break
 			}
 		}
-		
+
 		if !foundLevel3 {
 			t.Error("Expected to preserve original palette index values in projection")
 		}
@@ -358,8 +358,8 @@ func TestRainfallDataIntegration(t *testing.T) {
 
 	// Test searching for the high-rainfall area
 	t.Run("RainfallStormSearch", func(t *testing.T) {
-		origin := Point{X: 0, Y: 5}  // From left side
-		direction := Point{X: 1, Y: 0} // Moving right
+		origin := Point{X: 0, Y: 5}             // From left side
+		direction := Point{X: 1, Y: 0}          // Moving right
 		fieldOfViewAngleRadians := math.Pi / 12 // 15 degrees
 		distance := 15.0
 
@@ -376,7 +376,7 @@ func TestRainfallDataIntegration(t *testing.T) {
 				break
 			}
 		}
-		
+
 		if !foundHighRainfall {
 			t.Error("Expected to find high rainfall values (6.0) in storm search")
 		}
@@ -393,16 +393,16 @@ func TestPalettedImageCoordinateSystem(t *testing.T) {
 	}
 
 	// Add values in different regions of the image
-	testImage[5][10] = 3.0  // Value at row 5, col 10
+	testImage[5][10] = 3.0 // Value at row 5, col 10
 	testImage[5][11] = 3.0
 	testImage[5][12] = 3.0
-	testImage[10][5] = 7.0  // Value at row 10, col 5
+	testImage[10][5] = 7.0 // Value at row 10, col 5
 	testImage[11][5] = 7.0
 
 	// Test searching in the region with value 3
 	t.Run("SearchRegionWithValues", func(t *testing.T) {
-		origin := Point{X: 9, Y: 5}   // Start near the horizontal line of value 3
-		direction := Point{X: 1, Y: 0} // Move horizontally
+		origin := Point{X: 9, Y: 5}             // Start near the horizontal line of value 3
+		direction := Point{X: 1, Y: 0}          // Move horizontally
 		fieldOfViewAngleRadians := math.Pi / 18 // Narrow angle
 		distance := 5.0
 
@@ -419,7 +419,7 @@ func TestPalettedImageCoordinateSystem(t *testing.T) {
 				break
 			}
 		}
-		
+
 		if !foundValue3 {
 			t.Error("Expected to find value 3.0 in projection")
 		}
@@ -427,8 +427,8 @@ func TestPalettedImageCoordinateSystem(t *testing.T) {
 
 	// Test searching in the region with value 7
 	t.Run("SearchVerticalRegion", func(t *testing.T) {
-		origin := Point{X: 5, Y: 9}   // Start near the vertical line of value 7
-		direction := Point{X: 0, Y: 1} // Move vertically
+		origin := Point{X: 5, Y: 9}             // Start near the vertical line of value 7
+		direction := Point{X: 0, Y: 1}          // Move vertically
 		fieldOfViewAngleRadians := math.Pi / 18 // Narrow angle
 		distance := 5.0
 
@@ -445,7 +445,7 @@ func TestPalettedImageCoordinateSystem(t *testing.T) {
 				break
 			}
 		}
-		
+
 		if !foundValue7 {
 			t.Error("Expected to find value 7.0 in projection")
 		}
