@@ -47,25 +47,18 @@ func VisualizeExtrapolatedTracks(tracks []*Track, width, height, numFuturePoints
 			continue
 		}
 
-		// --- Draw existing track ---
+		// Assign a color based on the track ID
 		c := color.RGBA{
 			R: uint8((i * 40) % 255),
 			G: uint8((i * 60) % 255),
 			B: uint8((i * 80) % 255),
 			A: 255,
 		}
-		for j := 0; j < len(track.Points)-1; j++ {
-			p1 := image.Point{int(track.Points[j].Vec.X), int(track.Points[j].Vec.Y)}
-			p2 := image.Point{int(track.Points[j+1].Vec.X), int(track.Points[j+1].Vec.Y)}
-			gocv.Line(&img, p1, p2, c, 2)
-		}
 
-		// --- Draw extrapolated future path ---
+		// --- Draw extrapolated complete path (from beginning of track) ---
 		if numFuturePoints > 0 && track.PolyX.A != 0 { // Check if polynomial has been fitted
 			t0 := track.Points[0].Time
-			lastPoint := track.Points[len(track.Points)-1]
-			lastT := lastPoint.Time.Sub(t0).Seconds()
-			
+
 			// Calculate the average time interval between tracked points
 			var avgDt float64
 			if len(track.Points) > 1 {
@@ -75,16 +68,42 @@ func VisualizeExtrapolatedTracks(tracks []*Track, width, height, numFuturePoints
 				avgDt = 1.0 // Default if only one point
 			}
 
-			p1 := image.Point{int(lastPoint.Vec.X), int(lastPoint.Vec.Y)}
+			// Generate points for the whole path (original + extrapolated)
+			var allPoints []image.Point
 
+			// Add points for original track (evaluated using polynomial)
+			for j := 0; j < len(track.Points); j++ {
+				currentT := track.Points[j].Time.Sub(t0).Seconds()
+				x := track.PolyX.Eval(currentT)
+				y := track.PolyY.Eval(currentT)
+				allPoints = append(allPoints, image.Point{int(x), int(y)})
+			}
+
+			// Add points for extrapolated track
+			lastT := track.Points[len(track.Points)-1].Time.Sub(t0).Seconds()
 			for j := 1; j <= numFuturePoints; j++ {
 				futureT := lastT + float64(j)*avgDt
 				futureX := track.PolyX.Eval(futureT)
 				futureY := track.PolyY.Eval(futureT)
-				p2 := image.Point{int(futureX), int(futureY)}
+				allPoints = append(allPoints, image.Point{int(futureX), int(futureY)})
+			}
 
-				gocv.Line(&img, p1, p2, color.RGBA{R: 255, G: 0, B: 0, A: 255}, 1)
-				p1 = p2
+			// Draw the full extrapolated path as solid line
+			for j := 0; j < len(allPoints)-1; j++ {
+				gocv.Line(&img, allPoints[j], allPoints[j+1], c, 2)
+			}
+			
+			// Draw original track data points as circles to distinguish them from extrapolated path
+			for j := 0; j < len(track.Points); j++ {
+				center := image.Point{int(track.Points[j].Vec.X), int(track.Points[j].Vec.Y)}  // Actual original point
+				gocv.Circle(&img, center, 4, c, 2)  // Draw circle with radius 4
+			}
+		} else {
+			// If no extrapolation is possible, just draw the original track as solid
+			for j := 0; j < len(track.Points)-1; j++ {
+				p1 := image.Point{int(track.Points[j].Vec.X), int(track.Points[j].Vec.Y)}
+				p2 := image.Point{int(track.Points[j+1].Vec.X), int(track.Points[j+1].Vec.Y)}
+				gocv.Line(&img, p1, p2, c, 2)
 			}
 		}
 	}
