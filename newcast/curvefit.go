@@ -4,14 +4,22 @@ import (
 	"errors"
 )
 
-// Polynomial represents the coefficients of a degree 2 polynomial: a*t^2 + b*t + c
+// Polynomial represents a quadratic curve of the form f(t) = At^2 + Bt + C.
+// It is used to model the motion of a feature in one dimension (either x or y)
+// over time.
 type Polynomial struct {
-	A, B, C float64
+	A, B, C float64 // Coefficients of the quadratic polynomial.
 }
 
-// FitQuadratic fits a degree 2 polynomial to the X and Y coordinates of the track points.
-// It returns two Polynomials, one for the X dimension and one for the Y dimension.
-// This is a direct implementation of a least-squares fit for a quadratic curve.
+// FitQuadratic performs a least-squares fit of a quadratic polynomial to a
+// series of time-stamped points. It fits the x and y coordinates independently.
+// The time 't' is measured in seconds from the timestamp of the first point.
+//
+// It requires at least 3 points to perform the fit.
+//
+// The function solves the normal equations for the polynomial coefficients
+// using Cramer's rule for a 3x3 system. It returns two Polynomial objects,
+// one for the x-coordinates and one for the y-coordinates.
 func FitQuadratic(points []Point) (polyX, polyY Polynomial, err error) {
 	n := len(points)
 	if n < 3 {
@@ -113,17 +121,20 @@ func copyMatrix(m [][]float64) [][]float64 {
 }
 
 
-// Eval evaluates the polynomial at a given time t.
+// Eval calculates the value of the polynomial at a given time t.
+// The time t is typically in seconds from the start of the observation period.
 func (p *Polynomial) Eval(t float64) float64 {
 	return p.A*t*t + p.B*t + p.C
 }
 
-// Velocity evaluates the velocity (first derivative) of the polynomial at time t.
+// Velocity calculates the first derivative of the polynomial at time t,
+// which represents the instantaneous velocity.
 func (p *Polynomial) Velocity(t float64) float64 {
 	return 2*p.A*t + p.B
 }
 
-// Acceleration evaluates the acceleration (second derivative) of the polynomial.
+// Acceleration calculates the second derivative of the polynomial, which
+// represents the constant acceleration.
 func (p *Polynomial) Acceleration() float64 {
 	return 2 * p.A
 }

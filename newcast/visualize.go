@@ -7,8 +7,13 @@ import (
 	"gocv.io/x/gocv"
 )
 
-// VisualizeTracks draws the paths of the tracks on a black background.
-// Each track is drawn in a different color.
+// VisualizeTracks draws the historical paths of the tracks.
+//
+// It creates a new black image of the specified width and height. Each track is
+// drawn as a series of connected lines in a unique color. This is useful for
+// seeing the complete path that each feature has taken.
+//
+// Returns a gocv.Mat containing the visualization.
 func VisualizeTracks(tracks []*Track, width, height int) gocv.Mat {
 	img := gocv.NewMatWithSize(height, width, gocv.MatTypeCV8UC3)
 	img.SetTo(gocv.NewScalar(0, 0, 0, 0)) // Black background
@@ -37,7 +42,15 @@ func VisualizeTracks(tracks []*Track, width, height int) gocv.Mat {
 	return img
 }
 
-// VisualizeExtrapolatedTracks draws the actual and extrapolated future paths of tracks.
+// VisualizeExtrapolatedTracks draws both the historical and the predicted future
+// paths of tracks.
+//
+// The historical path is drawn in a unique color for each track. The future path
+// is extrapolated using the fitted polynomial for each track and is drawn in red.
+// The extrapolation is only performed for tracks that have a valid polynomial model.
+//
+// numFuturePoints determines how many future time steps to predict and draw.
+// Returns a gocv.Mat containing the visualization.
 func VisualizeExtrapolatedTracks(tracks []*Track, width, height, numFuturePoints int) gocv.Mat {
 	img := gocv.NewMatWithSize(height, width, gocv.MatTypeCV8UC3)
 	img.SetTo(gocv.NewScalar(0, 0, 0, 0)) // Black background
@@ -92,7 +105,14 @@ func VisualizeExtrapolatedTracks(tracks []*Track, width, height, numFuturePoints
 	return img
 }
 
-// VisualizeVectors draws the final velocity vectors of the tracks.
+// VisualizeVectors draws the most recent velocity vector for each track.
+//
+// It creates a black image and draws an arrow for each track, starting at the
+// track's latest position and pointing in the direction of its latest velocity.
+// The length of the arrow is scaled by the `scale` factor. This is useful for
+// visualizing the instantaneous motion of all tracked features.
+//
+// Returns a gocv.Mat containing the visualization.
 func VisualizeVectors(tracks []*Track, width, height int, scale float32) gocv.Mat {
 	img := gocv.NewMatWithSize(height, width, gocv.MatTypeCV8UC3)
 	img.SetTo(gocv.NewScalar(0, 0, 0, 0)) // Black background

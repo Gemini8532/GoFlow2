@@ -44,7 +44,12 @@ func calculateSmoothnessMetric(track *Track) float64 {
 	return math.MaxFloat64 // Cannot be calculated, treat as infinitely noisy
 }
 
-// FilterTracksBySmoothness filters tracks based on a simple smoothness threshold.
+// FilterTracksBySmoothness removes tracks that are not smooth. Smoothness is
+// defined by the average change in angle between track segments. A smaller
+// average angle change indicates a smoother track.
+//
+// maxAverageAngleChange is the maximum allowed average angle change in radians.
+// Tracks with an average angle change greater than this value will be removed.
 func FilterTracksBySmoothness(tracks []*Track, maxAverageAngleChange float64) []*Track {
 	var smoothTracks []*Track
 	for _, track := range tracks {
@@ -55,8 +60,17 @@ func FilterTracksBySmoothness(tracks []*Track, maxAverageAngleChange float64) []
 	return smoothTracks
 }
 
-// FilterTracksByDensityAndSmoothness filters tracks based on spatial density,
-// keeping only the smoothest tracks in dense areas.
+// FilterTracksByDensityAndSmoothness helps to thin out tracks in areas where they
+// are too dense, preserving only the best ones. It works by dividing the image
+// area into a grid.
+//
+// Within each grid cell, it checks if the number of tracks exceeds a threshold.
+// If it does, it sorts the tracks in that cell by length (longer is better) and
+// then by smoothness (smoother is better), and keeps only the top tracks up to
+// maxTracksPerCell. Cells with fewer than minTracksPerCell are discarded entirely.
+//
+// This is useful for reducing noise and keeping only the most coherent and
+// significant motion tracks.
 func FilterTracksByDensityAndSmoothness(tracks []*Track, gridCellSize, minTracksPerCell, maxTracksPerCell int) []*Track {
 	if gridCellSize <= 0 {
 		gridCellSize = 32 // Default value
@@ -104,7 +118,15 @@ func FilterTracksByDensityAndSmoothness(tracks []*Track, gridCellSize, minTracks
 	return finalTracks
 }
 
-// FilterTracksByMaxAngleChange filters tracks by ensuring no single turn is too sharp.
+// FilterTracksByMaxAngleChange removes tracks that contain any single turn that
+// is too sharp. It iterates through the segments of each track and calculates
+// the angle between consecutive segments.
+//
+// If any of these angles exceeds maxAngleChange, the entire track is discarded.
+// This is useful for removing erratic or noisy tracks.
+//
+// maxAngleChange is the maximum allowed angle in radians between any two
+// consecutive segments of a track.
 func FilterTracksByMaxAngleChange(tracks []*Track, maxAngleChange float64) []*Track {
 	var smoothTracks []*Track
 

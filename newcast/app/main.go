@@ -13,7 +13,20 @@ import (
 )
 
 func main() {
+	// This application demonstrates the use of the newcast package to track features
+	// in a sequence of rainfall radar images. It performs the following steps:
+	// 1. Parses command-line flags to control various parameters.
+	// 2. Finds and loads a sequence of PNG images from the `rainfall_data` directory.
+	// 3. Initializes a newcast.Tracker and processes the images sequentially.
+	// 4. Retrieves the resulting feature tracks from the tracker.
+	// 5. Applies a series of filters to the tracks to remove noise and keep the
+	//    most significant and coherent tracks.
+	// 6. Generates several visualizations of the filtered tracks (paths, velocity
+	//    vectors, and extrapolated paths) and saves them as PNG files.
+
 	// --- Command-Line Flags ---
+	// These flags allow for tuning the tracker and filter parameters without
+	// recompiling the code.
 	numImages := flag.Int("numImages", 6, "Number of images to process from the sequence.")
 	maxFeatures := flag.Int("maxFeatures", 200, "Maximum number of features to track.")
 	smoothness := flag.Float64("smoothness", 0.5, "Smoothness threshold (max average angle change in radians).")
@@ -41,6 +54,9 @@ func main() {
 	}
 
 	// --- Find and Load Data ---
+	// The application searches for the `rainfall_data` directory in a few common
+	// locations relative to the execution path. It then reads all PNG files from
+	// this directory and sorts them alphabetically to ensure correct chronological order.
 	var rainfallDir string
 	possiblePaths := []string{"../../rainfall_data", "../rainfall_data", "rainfall_data"}
 	for _, path := range possiblePaths {
@@ -77,6 +93,9 @@ func main() {
 	testImagePaths := imagePaths[:*numImages]
 
 	// --- Run Tracker ---
+	// A new tracker is created, and then each image is added to it in sequence.
+	// The tracker handles the feature detection on the first frame and the
+	// optical flow tracking on subsequent frames.
 	fmt.Println("Running tracker on rainfall data...")
 	tracker, err := newcast.NewTracker(*maxFeatures)
 	if err != nil {
@@ -108,6 +127,12 @@ func main() {
 	fmt.Println("Tracking complete.")
 
 	// --- Filter and Generate Visualizations ---
+	// After tracking is complete, the raw tracks are retrieved. A preliminary filter
+	// is applied to remove tracks that are too short to be reliable. Then, one of
+	// several filtering strategies (controlled by the -filterType flag) is used
+	// to select the most coherent tracks.
+	// Finally, the `newcast.Visualize` functions are called to create PNG images
+	// showing the results, which are saved to the current directory.
 	allTracks := tracker.GetTracks()
 	fmt.Printf("Found %d surviving tracks.\n", len(allTracks))
 
