@@ -28,14 +28,14 @@ async function unmarshalVectorFrame(blob: Blob): Promise<Frame> {
 
   const width = bitmap.width;
   const height = bitmap.height;
-  
+
   // Use an offscreen canvas to extract raw bytes
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) throw new Error("No Canvas Context");
-  
+
   ctx.drawImage(bitmap, 0, 0);
   const imgData = ctx.getImageData(0, 0, width, height);
   const pixels = imgData.data;
@@ -71,7 +71,7 @@ async function unmarshalVectorFrame(blob: Blob): Promise<Frame> {
 
 function generateMockFrame(t: number, width: number, height: number): Frame {
   const data = new Float32Array(width * height * 2);
-  
+
   // Create a swirling vector field that evolves over time t
   const timeOffset = t * 0.5;
   const centerX = width / 2;
@@ -80,24 +80,24 @@ function generateMockFrame(t: number, width: number, height: number): Frame {
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const idx = (y * width + x) * 2;
-      
+
       // Normalized coordinates -1 to 1
       const nx = (x - centerX) / centerX;
       const ny = (y - centerY) / centerY;
-      
+
       // Simple vortex math + sine wave ripple over time
-      const dist = Math.sqrt(nx*nx + ny*ny);
+      const dist = Math.sqrt(nx * nx + ny * ny);
       const angle = Math.atan2(ny, nx);
-      
+
       // Velocity components
       const speed = 20.0 * Math.exp(-dist * 2) * Math.cos(dist * 10 - timeOffset);
-      
+
       // Tangential flow (vortex) + Radial flow (expansion)
       const vx = -Math.sin(angle) * speed + Math.cos(angle) * (Math.sin(timeOffset) * 5);
       const vy = Math.cos(angle) * speed + Math.sin(angle) * (Math.sin(timeOffset) * 5);
 
       data[idx] = vx;
-      data[idx+1] = vy;
+      data[idx + 1] = vy;
     }
   }
 
@@ -106,14 +106,14 @@ function generateMockFrame(t: number, width: number, height: number): Frame {
 
 // --- Components ---
 
-const VectorCanvas = ({ 
-  frame, 
-  stride, 
-  scale, 
-  onHover 
-}: { 
-  frame: Frame | null, 
-  stride: number, 
+const VectorCanvas = ({
+  frame,
+  stride,
+  scale,
+  onHover
+}: {
+  frame: Frame | null,
+  stride: number,
   scale: number,
   onHover: (x: number, y: number, vx: number, vy: number) => void
 }) => {
@@ -125,10 +125,10 @@ const VectorCanvas = ({
     const rect = canvasRef.current.getBoundingClientRect();
     const x = Math.floor((e.clientX - rect.left) * (frame.width / rect.width));
     const y = Math.floor((e.clientY - rect.top) * (frame.height / rect.height));
-    
+
     if (x >= 0 && x < frame.width && y >= 0 && y < frame.height) {
       const idx = (y * frame.width + x) * 2;
-      onHover(x, y, frame.data[idx], frame.data[idx+1]);
+      onHover(x, y, frame.data[idx], frame.data[idx + 1]);
     }
   };
 
@@ -154,16 +154,16 @@ const VectorCanvas = ({
         // Color Mapping
         const angle = Math.atan2(vy, vx);
         const degrees = (angle * 180 / Math.PI + 360) % 360;
-        
+
         ctx.strokeStyle = `hsl(${degrees}, 80%, 60%)`;
         ctx.fillStyle = `hsl(${degrees}, 80%, 60%)`;
         ctx.lineWidth = 1;
 
         // Draw Arrow
         const len = Math.min(stride * 1.2, mag * scale);
-        const cx = x + stride/2; // Center in the grid cell
-        const cy = y + stride/2;
-        
+        const cx = x + stride / 2; // Center in the grid cell
+        const cy = y + stride / 2;
+
         const endX = cx + Math.cos(angle) * len;
         const endY = cy + Math.sin(angle) * len;
 
@@ -210,12 +210,12 @@ export default function App() {
   const [maxTime] = useState(20);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(200); // ms per frame
-  
+
   const [stride, setStride] = useState(16);
   const [arrowScale, setArrowScale] = useState(1.5);
-  
+
   const [currentFrame, setCurrentFrame] = useState<Frame | null>(null);
-  const [hoverInfo, setHoverInfo] = useState<{x:number, y:number, vx:number, vy:number} | null>(null);
+  const [hoverInfo, setHoverInfo] = useState<{ x: number, y: number, vx: number, vy: number } | null>(null);
 
   // --- Data Loading Logic ---
 
@@ -236,7 +236,7 @@ export default function App() {
         console.error("Failed to load frame", e);
       }
       */
-     
+
       // --- DEMO MODE: Generating math data locally ---
       const mock = generateMockFrame(timeStep, 256, 256);
       if (isMounted) setCurrentFrame(mock);
@@ -249,7 +249,7 @@ export default function App() {
 
   // --- Playback Loop ---
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: number;
     if (isPlaying) {
       interval = setInterval(() => {
         setTimeStep(prev => (prev + 1) % maxTime);
@@ -266,7 +266,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 p-6 font-sans">
       <div className="max-w-5xl mx-auto">
-        
+
         {/* Header */}
         <header className="mb-6 flex justify-between items-end">
           <div>
@@ -275,10 +275,10 @@ export default function App() {
           </div>
           <div className="text-right text-xs text-gray-500">
             <div className="flex items-center gap-2 justify-end mb-1">
-               <div className="w-3 h-3 rounded-full bg-red-500"></div> +X
-               <div className="w-3 h-3 rounded-full bg-green-500"></div> +Y
-               <div className="w-3 h-3 rounded-full bg-cyan-500"></div> -X
-               <div className="w-3 h-3 rounded-full bg-purple-500"></div> -Y
+              <div className="w-3 h-3 rounded-full bg-red-500"></div> +X
+              <div className="w-3 h-3 rounded-full bg-green-500"></div> +Y
+              <div className="w-3 h-3 rounded-full bg-cyan-500"></div> -X
+              <div className="w-3 h-3 rounded-full bg-purple-500"></div> -Y
             </div>
             Resolution: {currentFrame ? `${currentFrame.width}x${currentFrame.height}` : 'Loading...'}
           </div>
@@ -286,10 +286,10 @@ export default function App() {
 
         {/* Main Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
+
           {/* Left: Controls */}
           <div className="lg:col-span-1 space-y-6">
-            
+
             {/* Playback Controls */}
             <div className="bg-gray-900 p-5 rounded-lg border border-gray-800">
               <div className="flex justify-between items-center mb-4">
@@ -298,20 +298,20 @@ export default function App() {
               </div>
 
               <div className="flex items-center gap-2 mb-4">
-                 <button onClick={prevStep} className="p-2 hover:bg-gray-800 rounded transition"><ChevronLeft size={20}/></button>
-                 <button 
-                  onClick={togglePlay} 
+                <button onClick={prevStep} className="p-2 hover:bg-gray-800 rounded transition"><ChevronLeft size={20} /></button>
+                <button
+                  onClick={togglePlay}
                   className={`flex-1 flex items-center justify-center gap-2 p-2 rounded font-medium transition ${isPlaying ? 'bg-red-900/50 text-red-200 hover:bg-red-900/70' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
-                 >
-                   {isPlaying ? <><Pause size={18}/> Pause</> : <><Play size={18}/> Play</>}
-                 </button>
-                 <button onClick={nextStep} className="p-2 hover:bg-gray-800 rounded transition"><ChevronRight size={20}/></button>
+                >
+                  {isPlaying ? <><Pause size={18} /> Pause</> : <><Play size={18} /> Play</>}
+                </button>
+                <button onClick={nextStep} className="p-2 hover:bg-gray-800 rounded transition"><ChevronRight size={20} /></button>
               </div>
 
-              <input 
-                type="range" 
-                min="0" max={maxTime - 1} 
-                value={timeStep} 
+              <input
+                type="range"
+                min="0" max={maxTime - 1}
+                value={timeStep}
                 onChange={(e) => { setIsPlaying(false); setTimeStep(parseInt(e.target.value)); }}
                 className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
               />
@@ -326,31 +326,31 @@ export default function App() {
               <div className="flex items-center gap-2 mb-4 text-sm font-medium text-gray-300">
                 <Settings size={16} /> Visualization Settings
               </div>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">Stride (Density): {stride}px</label>
-                  <input 
+                  <input
                     type="range" min="4" max="64" step="4"
-                    value={stride} 
+                    value={stride}
                     onChange={(e) => setStride(parseInt(e.target.value))}
                     className="w-full h-1 bg-gray-700 rounded appearance-none accent-gray-400"
                   />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">Arrow Scale: {arrowScale.toFixed(1)}x</label>
-                  <input 
+                  <input
                     type="range" min="0.1" max="5.0" step="0.1"
-                    value={arrowScale} 
+                    value={arrowScale}
                     onChange={(e) => setArrowScale(parseFloat(e.target.value))}
                     className="w-full h-1 bg-gray-700 rounded appearance-none accent-gray-400"
                   />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">Playback Speed: {playbackSpeed}ms</label>
-                  <input 
+                  <input
                     type="range" min="50" max="1000" step="50"
-                    value={playbackSpeed} 
+                    value={playbackSpeed}
                     onChange={(e) => setPlaybackSpeed(parseInt(e.target.value))}
                     className="w-full h-1 bg-gray-700 rounded appearance-none accent-gray-400"
                   />
@@ -366,20 +366,20 @@ export default function App() {
               {hoverInfo && hoverInfo.x !== -1 ? (
                 <div className="space-y-1 font-mono text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Pos:</span> 
+                    <span className="text-gray-500">Pos:</span>
                     <span>({hoverInfo.x}, {hoverInfo.y})</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Vec X:</span> 
+                    <span className="text-gray-500">Vec X:</span>
                     <span className={hoverInfo.vx < 0 ? 'text-red-400' : 'text-green-400'}>{hoverInfo.vx.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Vec Y:</span> 
+                    <span className="text-gray-500">Vec Y:</span>
                     <span className={hoverInfo.vy < 0 ? 'text-red-400' : 'text-green-400'}>{hoverInfo.vy.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between border-t border-gray-700 mt-2 pt-2">
-                    <span className="text-gray-500">Mag:</span> 
-                    <span className="text-white">{Math.sqrt(hoverInfo.vx**2 + hoverInfo.vy**2).toFixed(2)}</span>
+                    <span className="text-gray-500">Mag:</span>
+                    <span className="text-white">{Math.sqrt(hoverInfo.vx ** 2 + hoverInfo.vy ** 2).toFixed(2)}</span>
                   </div>
                 </div>
               ) : (
@@ -393,15 +393,15 @@ export default function App() {
 
           {/* Right: Canvas */}
           <div className="lg:col-span-2 bg-black rounded-lg overflow-hidden border border-gray-800 shadow-2xl relative">
-             <VectorCanvas 
-                frame={currentFrame} 
-                stride={stride} 
-                scale={arrowScale}
-                onHover={(x, y, vx, vy) => setHoverInfo({x, y, vx, vy})}
-             />
-             <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 text-gray-400 text-xs rounded backdrop-blur-sm pointer-events-none">
-               Canvas Render
-             </div>
+            <VectorCanvas
+              frame={currentFrame}
+              stride={stride}
+              scale={arrowScale}
+              onHover={(x, y, vx, vy) => setHoverInfo({ x, y, vx, vy })}
+            />
+            <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 text-gray-400 text-xs rounded backdrop-blur-sm pointer-events-none">
+              Canvas Render
+            </div>
           </div>
 
         </div>
