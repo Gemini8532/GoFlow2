@@ -57,30 +57,22 @@ func VisualizeExtrapolatedTracks(tracks []*Track, width, height, numFuturePoints
 
 		// --- Draw extrapolated complete path (from beginning of track) ---
 		if numFuturePoints > 0 && track.PolyX.A != 0 { // Check if polynomial has been fitted
-			t0 := track.Points[0].Time
-
-			// Calculate the average time interval between tracked points
-			var avgDt float64
-			if len(track.Points) > 1 {
-				totalDuration := track.Points[len(track.Points)-1].Time.Sub(track.Points[0].Time).Seconds()
-				avgDt = totalDuration / float64(len(track.Points)-1)
-			} else {
-				avgDt = 1.0 // Default if only one point
-			}
+			// The average time delta is implicitly 1.0
+			avgDt := 1.0
 
 			// Generate points for the whole path (original + extrapolated)
 			var allPoints []image.Point
 
 			// Add points for original track (evaluated using polynomial)
 			for j := 0; j < len(track.Points); j++ {
-				currentT := track.Points[j].Time.Sub(t0).Seconds()
+				currentT := float64(j)
 				x := track.PolyX.Eval(currentT)
 				y := track.PolyY.Eval(currentT)
 				allPoints = append(allPoints, image.Point{int(x), int(y)})
 			}
 
 			// Add points for extrapolated track
-			lastT := track.Points[len(track.Points)-1].Time.Sub(t0).Seconds()
+			lastT := float64(len(track.Points) - 1)
 			for j := 1; j <= numFuturePoints; j++ {
 				futureT := lastT + float64(j)*avgDt
 				futureX := track.PolyX.Eval(futureT)

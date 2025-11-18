@@ -2,15 +2,13 @@ package newcast
 
 import (
 	"fmt"
-	"time"
 
 	"gocv.io/x/gocv"
 )
 
-// Point represents a point in time and space.
+// Point represents a point in space.
 type Point struct {
-	Time time.Time
-	Vec  gocv.Point2f
+	Vec gocv.Point2f
 }
 
 // Track represents the path of a single feature over time.
@@ -57,14 +55,14 @@ func (t *Tracker) Close() {
 // AddImage processes a new image in the sequence.
 // img is the new image.
 // timestamp is the time the image was captured.
-func (t *Tracker) AddImage(img gocv.Mat, timestamp time.Time) error {
+func (t *Tracker) AddImage(img gocv.Mat) error {
 	if img.Empty() {
 		return fmt.Errorf("input image is empty")
 	}
 
 	// If this is the first image, find features to track.
 	if t.prevImg.Empty() {
-		return t.initializeTracks(img, timestamp)
+		return t.initializeTracks(img)
 	}
 
 	// Track features from the previous image to the current one.
@@ -78,7 +76,7 @@ func (t *Tracker) AddImage(img gocv.Mat, timestamp time.Time) error {
 	gocv.CalcOpticalFlowPyrLK(t.prevImg, img, t.prevPoints, nextPoints, &status, &errMat)
 
 	// Update tracks with the new points.
-	t.updateTracks(nextPoints, status, timestamp)
+	t.updateTracks(nextPoints, status)
 
 	// Update the previous image and points for the next iteration.
 	t.prevImg.Close()
@@ -89,7 +87,7 @@ func (t *Tracker) AddImage(img gocv.Mat, timestamp time.Time) error {
 }
 
 // initializeTracks finds good features in the first image and creates initial tracks.
-func (t *Tracker) initializeTracks(img gocv.Mat, timestamp time.Time) error {
+func (t *Tracker) initializeTracks(img gocv.Mat) error {
 	points := gocv.NewMat()
 	defer points.Close()
 
@@ -102,7 +100,7 @@ func (t *Tracker) initializeTracks(img gocv.Mat, timestamp time.Time) error {
 		ptVec := points.GetVecfAt(i, 0)
 		track := &Track{
 			ID:     t.nextTrackID,
-			Points: []Point{{Time: timestamp, Vec: gocv.Point2f{X: ptVec[0], Y: ptVec[1]}}},
+			Points: []Point{{Vec: gocv.Point2f{X: ptVec[0], Y: ptVec[1]}}},
 			Lost:   false,
 		}
 		t.tracks = append(t.tracks, track)
@@ -117,7 +115,7 @@ func (t *Tracker) initializeTracks(img gocv.Mat, timestamp time.Time) error {
 }
 
 // updateTracks updates the feature tracks with new points and manages lost tracks.
-func (t *Tracker) updateTracks(nextPoints, status gocv.Mat, timestamp time.Time) {
+func (t *Tracker) updateTracks(nextPoints, status gocv.Mat) {
 	survivingTracks := []*Track{}
 	for i, track := range t.tracks {
 		if track.Lost {
@@ -128,15 +126,13 @@ func (t *Tracker) updateTracks(nextPoints, status gocv.Mat, timestamp time.Time)
 			if nextPoints.Channels() == 2 {
 				ptVec := nextPoints.GetVecfAt(i, 0)
 				newPoint = Point{
-					Time: timestamp,
-					Vec:  gocv.Point2f{X: ptVec[0], Y: ptVec[1]},
+					Vec: gocv.Point2f{X: ptVec[0], Y: ptVec[1]},
 				}
 			} else {
 				x := nextPoints.GetFloatAt(i, 0)
 				y := nextPoints.GetFloatAt(i, 1)
 				newPoint = Point{
-					Time: timestamp,
-					Vec:  gocv.Point2f{X: x, Y: y},
+					Vec: gocv.Point2f{X: x, Y: y},
 				}
 			}
 			track.Points = append(track.Points, newPoint)
@@ -180,8 +176,7 @@ func (t *Tracker) estimateMotion(track *Track) {
 		if err == nil {
 			track.PolyX = polyX
 			track.PolyY = polyY
-			t0 := track.Points[0].Time
-			lastT := track.Points[numPoints-1].Time.Sub(t0).Seconds()
+			lastT := float64(numPoints - 1)
 
 			vx := float32(polyX.Velocity(lastT))
 			vy := float32(polyY.Velocity(lastT))
@@ -197,29 +192,23 @@ func (t *Tracker) estimateMotion(track *Track) {
 	// Fallback to simple finite differences if curve fitting fails or not enough points
 	p1 := track.Points[numPoints-1]
 	p0 := track.Points[numPoints-2]
-	dt := p1.Time.Sub(p0.Time).Seconds()
-	if dt > 0 {
-		vx := (p1.Vec.X - p0.Vec.X) / float32(dt)
-		vy := (p1.Vec.Y - p0.Vec.Y) / float32(dt)
-		track.LatestVelocity = gocv.Point2f{X: vx, Y: vy}
-	}
+	dt := float32(1.0)
+	vx := (p1.Vec.X - p0.Vec.X) / dt
+	vy := (p1.Vec.Y - p0.Vec.Y) / dt
+	track.LatestVelocity = gocv.Point2f{X: vx, Y: vy}
 
 	if numPoints < 3 {
 		return
 	}
 	p_minus_1 := track.Points[numPoints-3]
-	dt_prev := p0.Time.Sub(p_minus_1.Time).Seconds()
-	if dt_prev > 0 {
-		vx_prev := (p0.Vec.X - p_minus_1.Vec.X) / float32(dt_prev)
-		vy_prev := (p0.Vec.Y - p_minus_1.Vec.Y) / float32(dt_prev)
+	dt_prev := float32(1.0)
+	vx_prev := (p0.Vec.X - p_minus_1.Vec.X) / dt_prev
+	vy_prev := (p0.Vec.Y - p_minus_1.Vec.Y) / dt_prev
 
-		avg_dt := (dt + dt_prev) / 2.0
-		if avg_dt > 0 {
-			ax := (track.LatestVelocity.X - vx_prev) / float32(avg_dt)
-			ay := (track.LatestVelocity.Y - vy_prev) / float32(avg_dt)
-			track.LatestAcceleration = gocv.Point2f{X: ax, Y: ay}
-		}
-	}
+	avg_dt := (dt + dt_prev) / 2.0
+	ax := (track.LatestVelocity.X - vx_prev) / float32(avg_dt)
+	ay := (track.LatestVelocity.Y - vy_prev) / float32(avg_dt)
+	track.LatestAcceleration = gocv.Point2f{X: ax, Y: ay}
 }
 
 // GetTracks returns the current set of active tracks.

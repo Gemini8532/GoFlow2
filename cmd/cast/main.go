@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"time"
 
 	"gocv.io/x/gocv"
 )
@@ -76,8 +75,7 @@ func main() {
 			height = img.Rows()
 		}
 
-		ts := time.Now().Add(time.Duration(i) * time.Minute)
-		if err := tracker.AddImage(img, ts); err != nil {
+		if err := tracker.AddImage(img); err != nil {
 			fmt.Printf("Error adding image %s: %v\n", imgPath, err)
 			os.Exit(1)
 		}

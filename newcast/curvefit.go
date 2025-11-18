@@ -18,14 +18,12 @@ func FitQuadratic(points []Point) (polyX, polyY Polynomial, err error) {
 		return Polynomial{}, Polynomial{}, errors.New("not enough points to fit quadratic")
 	}
 
-	t0 := points[0].Time
-
 	var sumT, sumT2, sumT3, sumT4 float64
 	var sumX, sumTX, sumT2X float64
 	var sumY, sumTY, sumT2Y float64
 
-	for _, p := range points {
-		t := p.Time.Sub(t0).Seconds()
+	for i, p := range points {
+		t := float64(i)
 		t2 := t * t
 		t3 := t2 * t
 		t4 := t3 * t

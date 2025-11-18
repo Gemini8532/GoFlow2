@@ -8,7 +8,6 @@ import (
 	"math"
 	"os"
 	"testing"
-	"time"
 
 	"gocv.io/x/gocv"
 )
@@ -64,8 +63,7 @@ func TestTracker(t *testing.T) {
 	defer tracker.Close()
 
 	// Add the first image
-	ts1 := time.Now()
-	if err := tracker.AddImage(img1, ts1); err != nil {
+	if err := tracker.AddImage(img1); err != nil {
 		t.Fatalf("Failed to add first image: %v", err)
 	}
 
@@ -80,8 +78,7 @@ func TestTracker(t *testing.T) {
 	t.Logf("Found %d initial features to track.", len(initialTracks))
 
 	// Add the second image
-	ts2 := ts1.Add(1 * time.Second) // 1 second time difference
-	if err := tracker.AddImage(img2, ts2); err != nil {
+	if err := tracker.AddImage(img2); err != nil {
 		t.Fatalf("Failed to add second image: %v", err)
 	}
 
@@ -114,10 +111,11 @@ func TestTracker(t *testing.T) {
 	}
 
 	// Check velocity
-	// dt is 1 second, so velocity should be equal to displacement
+	// dt is implicitly 1.0, so velocity should be equal to displacement
 	vx := track.LatestVelocity.X
 	vy := track.LatestVelocity.Y
 	if math.Abs(float64(vx-expectedDx)) > 1.0 || math.Abs(float64(vy-expectedDy)) > 1.0 {
 		t.Errorf("Expected velocity close to (%f, %f), but got (%f, %f)", expectedDx, expectedDy, vx, vy)
 	}
 }
+

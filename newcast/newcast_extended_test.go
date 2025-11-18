@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
-	"time"
 	"math"
 )
 
@@ -116,13 +115,11 @@ func TestTrackerWithIrregularShape(t *testing.T) {
 	}
 	defer tracker.Close()
 
-	ts1 := time.Now()
-	if err := tracker.AddImage(img1, ts1); err != nil {
+	if err := tracker.AddImage(img1); err != nil {
 		t.Fatalf("Failed to add first image: %v", err)
 	}
 
-	ts2 := ts1.Add(1 * time.Second)
-	if err := tracker.AddImage(img2, ts2); err != nil {
+	if err := tracker.AddImage(img2); err != nil {
 		t.Fatalf("Failed to add second image: %v", err)
 	}
 
@@ -134,16 +131,23 @@ func TestTrackerWithIrregularShape(t *testing.T) {
 
 	// Check the average displacement
 	var totalDx, totalDy float32
+	var validTracks int
 	for _, track := range tracks {
 		if len(track.Points) == 2 {
 			p1 := track.Points[0].Vec
 			p2 := track.Points[1].Vec
 			totalDx += p2.X - p1.X
 			totalDy += p2.Y - p1.Y
+			validTracks++
 		}
 	}
-	avgDx := totalDx / float32(len(tracks))
-	avgDy := totalDy / float32(len(tracks))
+
+	if validTracks == 0 {
+		t.Fatal("No tracks had 2 points to compare.")
+	}
+
+	avgDx := totalDx / float32(validTracks)
+	avgDy := totalDy / float32(validTracks)
 
 	if math.Abs(float64(avgDx-float32(shiftX))) > 2.0 || math.Abs(float64(avgDy-float32(shiftY))) > 2.0 {
 		t.Errorf("Expected average displacement close to (%d, %d), but got (%.2f, %.2f)", shiftX, shiftY, avgDx, avgDy)
@@ -193,14 +197,12 @@ func TestTrackerWithChangingShape(t *testing.T) {
 	}
 	defer tracker.Close()
 
-	ts1 := time.Now()
-	if err := tracker.AddImage(img1, ts1); err != nil {
+	if err := tracker.AddImage(img1); err != nil {
 		t.Fatalf("Failed to add first image: %v", err)
 	}
 	initialTracks := len(tracker.GetTracks())
 
-	ts2 := ts1.Add(1 * time.Second)
-	if err := tracker.AddImage(img2, ts2); err != nil {
+	if err := tracker.AddImage(img2); err != nil {
 		t.Fatalf("Failed to add second image: %v", err)
 	}
 
@@ -259,8 +261,7 @@ func TestTrackerWithFeatureLoss(t *testing.T) {
 	}
 	defer tracker.Close()
 
-	ts1 := time.Now()
-	if err := tracker.AddImage(img1, ts1); err != nil {
+	if err := tracker.AddImage(img1); err != nil {
 		t.Fatalf("Failed to add first image: %v", err)
 	}
 	initialTracks := len(tracker.GetTracks())
@@ -269,8 +270,7 @@ func TestTrackerWithFeatureLoss(t *testing.T) {
 	}
 	t.Logf("Initial tracks: %d", initialTracks)
 
-	ts2 := ts1.Add(1 * time.Second)
-	if err := tracker.AddImage(img2, ts2); err != nil {
+	if err := tracker.AddImage(img2); err != nil {
 		t.Fatalf("Failed to add second image: %v", err)
 	}
 
@@ -334,8 +334,7 @@ func TestTrackerWithSquareToTriangle(t *testing.T) {
 	}
 	defer tracker.Close()
 
-	ts1 := time.Now()
-	if err := tracker.AddImage(img1, ts1); err != nil {
+	if err := tracker.AddImage(img1); err != nil {
 		t.Fatalf("Failed to add first image: %v", err)
 	}
 	initialTracks := tracker.GetTracks()
@@ -354,8 +353,7 @@ func TestTrackerWithSquareToTriangle(t *testing.T) {
 		}
 	}
 
-	ts2 := ts1.Add(1 * time.Second)
-	if err := tracker.AddImage(img2, ts2); err != nil {
+	if err := tracker.AddImage(img2); err != nil {
 		t.Fatalf("Failed to add second image: %v", err)
 	}
 
@@ -451,8 +449,7 @@ func TestTrackerWithRainfallData(t *testing.T) {
 		}
 		defer img.Close()
 
-		ts := time.Now().Add(time.Duration(i) * time.Minute) // Simulate timestamps
-		if err := tracker.AddImage(img, ts); err != nil {
+		if err := tracker.AddImage(img); err != nil {
 			t.Fatalf("Failed to add image %s: %v", imgPath, err)
 		}
 

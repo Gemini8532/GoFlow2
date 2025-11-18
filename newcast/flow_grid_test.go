@@ -1,68 +1,75 @@
 package newcast
 
 import (
+
 	"fmt"
+
 	"log"
-	"path/filepath"
-	"strings"
+
 	"testing"
-	"time"
+
+
 
 	"github.com/stretchr/testify/assert"
+
 )
 
+
+
 var files = []string{
+
 	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T13:45:00Z.png",
+
 	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T13:50:00Z.png",
+
 	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T13:55:00Z.png",
+
 	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T14:00:00Z.png",
+
 	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T14:05:00Z.png",
+
 	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T14:10:00Z.png",
+
 	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T14:15:00Z.png",
+
 	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T14:20:00Z.png",
+
 	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T14:25:00Z.png",
+
 	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T14:30:00Z.png",
+
 }
 
-// TimeFromName extracts a time.Time value from a filename
-// expects format like "path/to/2025-11-18T13:45:00Z.png"
-func TimeFromName(filename string) time.Time {
-	// Extract just the filename from the path
-	baseName := filepath.Base(filename)
 
-	// Find the position of ".png" to locate the timestamp
-	extIndex := strings.LastIndex(baseName, ".png")
-	if extIndex == -1 {
-		return time.Time{} // Return zero time if not found
-	}
-
-	// Extract the timestamp part (before ".png")
-	timestampStr := baseName[:extIndex]
-
-	// Parse the timestamp (expecting RFC3339 format like "2006-01-02T15:04:05Z")
-	t, err := time.Parse("2006-01-02T15:04:05Z", timestampStr)
-	if err != nil {
-		return time.Time{} // Return zero time if parsing fails
-	}
-
-	return t
-}
 
 func TestLow(t *testing.T) {
+
 	maxFeatures := 1000
+
 	tracker, err := NewTracker(maxFeatures)
+
 	if err != nil {
+
 		t.Fatalf("Failed to create tracker: %v", err)
+
 	}
+
 	defer tracker.Close()
+
 	for _, f := range files {
+
 		img, err := loadImageAsGrayscale(f)
+
 		assert.NoError(t, err)
-		tfile := TimeFromName(f)
-		err = tracker.AddImage(img, tfile)
+
+		err = tracker.AddImage(img)
+
 	}
+
 	initialTracks := tracker.GetTracks()
+
 	log.Println("initialTracks", len(initialTracks))
+
 }
 
 func TestMain(t *testing.T) {
