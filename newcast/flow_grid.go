@@ -7,10 +7,6 @@ import (
 // Track represents a sequence of points over time.
 type LTrack []Point
 
-// Vector represents a 2D velocity vector.
-type Vector struct {
-	Vx, Vy float64
-}
 
 // FlowGrid is the clean, lightweight result structure.
 // It contains only the final vector field data.
@@ -114,7 +110,7 @@ func (fp *FlowProcessor) accumulateCell(t, x, y int, vx, vy, w float64) {
 }
 
 // ProcessTracks Phase 1: Accumulation.
-func (fp *FlowProcessor) ProcessTracks(tracks []Track) {
+func (fp *FlowProcessor) ProcessTracks(tracks []*Track) {
 
 	for _, ntrack := range tracks {
 		track := ntrack.Points

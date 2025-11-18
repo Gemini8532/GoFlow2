@@ -1,64 +1,118 @@
-# Go Rainflow Optical Flow Module
+# Goflow
 
-This module uses the Lucas-Kanade algorithm (via `gocv`) to predict optical flow
-by tracking features across a series of rainfall images.
+This repository contains tools for optical flow analysis on sequences of images, particularly geared towards rainfall data.
 
-## Important Dependency: OpenCV
+## Project Structure
 
-This module requires `gocv`, which in turn requires the native OpenCV (C++)
-libraries to be installed on your system.
+- `cmd/cast`: Command-line application to process image sequences into tracks, filter them, and visualize the results.
+- `cmd/serve`: HTTP API server to process image sequences and serve vector flow data as PNG images.
+- `newcast`: Core Go package containing the optical flow tracking, filtering, and grid generation logic.
+- `flowvis`: A web-based visualization client (React/TypeScript) for the `cmd/serve` API.
+- `rainfall_data/`: Sample rainfall image data.
+- `test_data/`: Test image data.
 
-If you're on a Debian-based Linux distribution (like Ubuntu), you can install the necessary dependencies like this:
+## Building and Running
+
+To build the Go applications:
 
 ```bash
-# Install OpenCV and its dependencies
-sudo apt-get update
-sudo apt-get install -y libopencv-dev
+go build ./...
 ```
 
-### `gocv` Compatibility
+### `cmd/cast` - Command-line Tracking and Visualization
 
-Note that the version of `gocv` used in this project (`v0.31.0`) is known to be compatible with OpenCV `4.6.0`, which is the version typically available through `apt` on recent Ubuntu distributions. If you have a different version of OpenCV installed, you may need to adjust the `gocv` version in `go.mod`.
+This tool takes a series of PNG images, tracks features, filters them, and can either generate visualizations locally or submit them to a `goflow` server for remote processing.
 
-This is only partially true - the version in ubuntu 22.04 is  4.5.4, this seems to be incompatible....
-I built 4.6.0 from scratch and installed it and it didn't work with v0.31.0 - but did with v0.30.0...
-Then I tried building the versoin of opencv in v0.31.0 from /home/jdp/go/pkg/mod/gocv.io/x/gocv@v0.31.0/
-the make install failed because libdc1394-22-dev is not available - so I edited the Makefile to use libdc1394-dev and make install worked...
-v0.31.0 now works
+#### Local Processing
 
-I got jules to test whether v0.30.0 works with the version of opencv in ubuntu 24.4 and it does - so that would have been an alternative
+This is the default mode. It generates visualization images directly.
 
-## How to Run
+**Usage:**
 
-1.  **Install Dependencies:** Make sure Go and OpenCV are installed on your system.
+```bash
+# Example: Process a sequence of rainfall images and generate visualizations
+go run cmd/cast/main.go -maxFeatures 200 -smoothness 0.5 -minTrackLength 6 rainfall_data/*.png
+```
 
-2.  **Get `gocv`:**
-    ```bash
-    go get gocv.io/x/gocv
-    ```
+The output will be `rainfall_tracks.png` and `rainfall_vectors.png` in the current directory.
 
-3.  **Prepare Images:** Place your sequential rainfall images (e.g., `frame01.png`, `frame02.png`, etc.) in a directory. These should be 1024x1024 PNG files.
+#### Remote Processing
 
-4.  **Run the Executable:**
-    ```bash
-    go run ./cmd/main.go [flags] <frame1.png> <frame2.png> ...
-    ```
+By providing the `-serverURL` flag, the tool will send the processing request to a running `goflow` server. Instead of creating local image files, it will output a series of `curl` commands that you can use to fetch the processed vector frames from the server.
 
-    This will create an `output_flow_map.png` file, which is a reduced-resolution
-    image showing the motion vectors. Each vector represents the total displacement
-    of a feature tracked from the first frame to the last.
+An optional `-id` flag can be used to specify a custom ID for the remote processing request. If not provided, a unique ID based on the current timestamp will be generated.
 
-## Command-Line Flags
+**Usage:**
 
--   `-output <path>`: The path to save the output flow map image. (Default: `output_flow_map.png`)
--   `-resolution-factor <int>`: The factor by which to downscale the final output image. (Default: `4`)
+```bash
+# Example: Send a sequence of rainfall images to a local server for processing
+go run cmd/cast/main.go -serverURL http://localhost:8080 rainfall_data/*.png
 
-## Module Structure
+# Example: Send a sequence of rainfall images with a custom ID
+go run cmd/cast/main.go -serverURL http://localhost:8080 -id "my-custom-id" rainfall_data/*.png
+```
 
--   `go.mod`: Defines the module and its `gocv` dependency.
--   `cmd/main.go`: The main executable for running the flow prediction.
--   `flow/`: The core package containing the optical flow logic.
-  - `lk.go`: Sparse feature tracking.
-  - `denseflow.go`: Dense flow map generation.
-  - `visualize.go`: Visualization utility functions.
--   `rainfall_data/`: A directory containing sample rainfall data.
+The output will be a success message and a list of `curl` commands, for example:
+```
+Successfully submitted processing request with ID: cast-1668792631
+To fetch the vector frames, use the following commands:
+curl -o frame_0.png "http://localhost:8080/vector-frame?id=cast-1668792631&t=0"
+curl -o frame_1.png "http://localhost:8080/vector-frame?id=cast-1668792631&t=1"
+...
+```
+
+### `cmd/serve` - HTTP API Server
+
+This server provides an API to process image sequences into vector flow grids and serve individual time-slices of these grids as PNG images.
+
+#### Running the server:
+
+```bash
+go run cmd/serve/main.go
+```
+
+The server will start on `http://localhost:8080`.
+
+#### API Endpoints:
+
+1.  **`/process` (POST)**
+    *   **Description**: Initiates the processing of an image sequence to generate a `FlowGrid`. The resulting `FlowGrid` is stored in memory, associated with a provided `id`.
+    *   **Method**: `POST`
+    *   **Content-Type**: `application/json`
+    *   **Request Body**:
+        ```json
+        {
+          "filenames": ["path/to/image1.png", "path/to/image2.png", ...],
+          "id": "your-unique-request-id"
+        }
+        ```
+        *   `filenames`: An array of paths to the image files to be processed.
+        *   `id`: A unique identifier for this processing request. This `id` will be used to retrieve the processed vector frames.
+    *   **Example `curl` command:**
+        ```bash
+        curl -X POST -H "Content-Type: application/json" \
+             -d '{"filenames": ["rainfall_data/2025-10-03T14:40:00Z.png", "rainfall_data/2025-10-03T14:45:00Z.png"], "id": "my-test-flow"}' \
+             http://localhost:8080/process
+        ```
+    *   **Response**: `200 OK` with `{"status": "success", "message": "FlowGrid generated and stored"}` on success, or an error message and appropriate status code on failure.
+
+2.  **`/vector-frame` (GET)**
+    *   **Description**: Retrieves a single vector flow frame (as a PNG image) for a given `id` and time index `t`. The image data is encoded using the `grid_encode` format, which can be interpreted by the `flowvis` frontend.
+    *   **Method**: `GET`
+    *   **Query Parameters**:
+        *   `id`: The unique identifier of the processed `FlowGrid` (as provided in the `/process` request).
+        *   `t`: The zero-based time index of the desired frame. This corresponds to the index in the `filenames` array provided during the `/process` step, minus one (since flow is calculated between frames).
+    *   **Example `curl` command:**
+        ```bash
+        curl -o frame_0.png "http://localhost:8080/vector-frame?id=my-test-flow&t=0"
+        ```
+        This would download the first vector frame (flow between image 0 and image 1) for the `my-test-flow` ID.
+    *   **Response**: `200 OK` with `Content-Type: image/png` and the binary PNG image data on success, or an error message and appropriate status code on failure.
+
+### `flowvis` - Web Visualization Client
+
+(Details about `flowvis` would go here, e.g., how to build and run it, and how it interacts with the `cmd/serve` API.)
+
+## Go Module
+
+This project uses Go Modules. The module name is `example/goflow`.

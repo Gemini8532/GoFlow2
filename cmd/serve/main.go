@@ -1,40 +1,176 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	
-	// Import your module path here, assuming it's in the same project
-	// "your-project/vectorgrid" 
+	"strconv"
+	"sync"
+
+	"example/goflow/newcast" // Adjust this import path if your module name is different
 )
 
+// Define a struct to hold the global state for our server
+type Server struct {
+	flowGrids map[string]*newcast.FlowGrid
+	mu        sync.RWMutex
+}
+
+func NewServer() *Server {
+	return &Server{
+		flowGrids: make(map[string]*newcast.FlowGrid),
+	}
+}
+
+func (s *Server) processHandler(w http.ResponseWriter, r *http.Request) {
+	// 1. CORS Headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "Only POST method is supported", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Filenames []string             `json:"filenames"`
+		ID        string               `json:"id"`
+		Config    *newcast.ProcessConfig `json:"config"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to decode request body: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	if len(req.Filenames) == 0 || req.ID == "" {
+		http.Error(w, "Filenames and ID are required", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Received process request for ID: %s with %d files", req.ID, len(req.Filenames))
+
+	// Use provided config or default
+	config := newcast.ProcessConfig{
+		MaxFeatures:      200,
+		Smoothness:       0.5,
+		FilterType:       "smoothness",
+		MaxAngle:         0.8,
+		GridCellSize:     64,
+		MinTracksPerCell: 2,
+		MaxTracksPerCell: 5,
+		MinTrackLength:   6,
+	}
+	if req.Config != nil {
+		config = *req.Config
+	}
+
+	filteredTracks, width, height, err := newcast.ProcessFilesToTracks(req.Filenames, config)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to process files to tracks: %v", err), http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Processed %d tracks. Image dimensions: %dx%d", len(filteredTracks), width, height)
+
+	if len(req.Filenames) <= 1 {
+		http.Error(w, "At least two filenames are required to generate flow (need current and next frame)", http.StatusBadRequest)
+		return
+	}
+	numTimeSteps := len(req.Filenames) - 1 // Flow is generated between frames
+
+	flowProcessor := newcast.NewFlowProcessor(width, height, numTimeSteps)
+	flowProcessor.ProcessTracks(filteredTracks)
+	flowProcessor.CalculateAverages()
+	flowProcessor.FillGaps(1) // Fill gaps with a radius of 1
+
+	s.mu.Lock()
+	s.flowGrids[req.ID] = flowProcessor.Grid
+	s.mu.Unlock()
+
+	log.Printf("FlowGrid for ID %s generated and stored successfully.", req.ID)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "FlowGrid generated and stored"})
+}
+
+func (s *Server) vectorFrameHandler(w http.ResponseWriter, r *http.Request) {
+	// 1. CORS Headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != "GET" {
+		http.Error(w, "Only GET method is supported", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+	tStr := r.URL.Query().Get("t")
+
+	if id == "" || tStr == "" {
+		http.Error(w, "ID and time index 't' are required query parameters", http.StatusBadRequest)
+		return
+	}
+
+	t, err := strconv.Atoi(tStr)
+	if err != nil {
+		http.Error(w, "Invalid time index 't'", http.StatusBadRequest)
+		return
+	}
+
+	s.mu.RLock()
+	flowGrid, ok := s.flowGrids[id]
+	s.mu.RUnlock()
+
+	if !ok {
+		http.Error(w, fmt.Sprintf("No FlowGrid found for ID: %s", id), http.StatusNotFound)
+		return
+	}
+
+	if t < 0 || t >= flowGrid.Time {
+		http.Error(w, fmt.Sprintf("Time index %d out of bounds (0 to %d)", t, flowGrid.Time-1), http.StatusBadRequest)
+		return
+	}
+
+	// Create a newcast.Frame from the FlowGrid time slice
+	frame := newcast.NewFrame(flowGrid.Width, flowGrid.Height)
+	startIndex := (t * flowGrid.Height) * flowGrid.Width
+	endIndex := startIndex + (flowGrid.Height * flowGrid.Width)
+	if endIndex > len(flowGrid.Data) {
+		endIndex = len(flowGrid.Data)
+	}
+
+	// Copy the relevant time slice data into the frame
+	copy(frame.Data, flowGrid.Data[startIndex:endIndex])
+
+	pngBytes, err := frame.MarshalPNG()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to marshal PNG: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/png")
+	w.Write(pngBytes)
+	log.Printf("Served vector frame for ID: %s, time: %d", id, t)
+}
+
 func main() {
-	// Mock data handler
-	http.HandleFunc("/vector-frame", func(w http.ResponseWriter, r *http.Request) {
-		// 1. CORS Headers (CRITICAL for canvas pixel reading)
-		// In production, replace "*" with your specific frontend domain
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-		
-		if r.Method == "OPTIONS" {
-			return
-		}
+	server := NewServer()
 
-		// 2. Create dummy data (or load from DB/File)
-		// In a real app, you'd use vectorgrid.NewFrame and populate it
-		// frame := vectorgrid.NewFrame(512, 512)
-		// ... populate frame ...
-		// pngBytes, _ := frame.MarshalPNG()
+	http.HandleFunc("/process", server.processHandler)
+	http.HandleFunc("/vector-frame", server.vectorFrameHandler)
 
-		// For this example, we just set Content-Type. 
-		// You would write the bytes generated by frame.MarshalPNG() here.
-		w.Header().Set("Content-Type", "image/png")
-		
-		// w.Write(pngBytes)
-		fmt.Println("Served vector frame")
-	})
-
-	fmt.Println("Serving vector data on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	fmt.Println("Serving vector data API on :9093")
+	log.Fatal(http.ListenAndServe(":9093", nil))
 }

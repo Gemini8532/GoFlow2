@@ -74,7 +74,7 @@ func TestMain(t *testing.T) {
 		{3.1, 2.1},
 		{4.1, 2.1},
 	}
-	tracks := []Track{Track{Points: points}}
+	tracks := []*Track{{Points: points}}
 
 	// 2. Run Operations
 	processor.ProcessTracks(tracks)

@@ -1,99 +1,53 @@
 package newcast
 
 import (
-	"bytes"
-	"fmt"
-	"image"
-	_ "image/png"
-	"math"
-	"os"
 	"testing"
 
-	"gocv.io/x/gocv"
+	"github.com/stretchr/testify/require"
 )
 
-// loadImageAsGrayscale loads an image from the given path and converts it to a grayscale gocv.Mat.
-func loadImageAsGrayscale(path string) (gocv.Mat, error) {
-	imgBytes, err := os.ReadFile(path)
-	if err != nil {
-		return gocv.NewMat(), fmt.Errorf("failed to read image file: %w", err)
-	}
-
-	img, _, err := image.Decode(bytes.NewReader(imgBytes))
-	if err != nil {
-		return gocv.NewMat(), fmt.Errorf("failed to decode image: %w", err)
-	}
-
-	mat, err := gocv.ImageToMatRGBA(img)
-	if err != nil {
-		return gocv.NewMat(), fmt.Errorf("failed to convert image to mat: %w", err)
-	}
-
-	gray := gocv.NewMat()
-	gocv.CvtColor(mat, &gray, gocv.ColorRGBAToGray)
-	mat.Close()
-
-	return gray, nil
-}
-
 func TestTracker(t *testing.T) {
-	// Paths to test images
+	// Paths to test images, relative to project root
 	imgPath1 := "../test_data/centered.png"
 	imgPath2 := "../test_data/shifted.png"
 
 	// Load images
 	img1, err := loadImageAsGrayscale(imgPath1)
-	if err != nil {
-		t.Fatalf("Failed to load image 1: %v", err)
-	}
+	require.NoError(t, err, "Failed to load image 1")
 	defer img1.Close()
 
 	img2, err := loadImageAsGrayscale(imgPath2)
-	if err != nil {
-		t.Fatalf("Failed to load image 2: %v", err)
-	}
+	require.NoError(t, err, "Failed to load image 2")
 	defer img2.Close()
 
 	// Create a new tracker
 	maxFeatures := 50
 	tracker, err := NewTracker(maxFeatures)
-	if err != nil {
-		t.Fatalf("Failed to create tracker: %v", err)
-	}
+	require.NoError(t, err, "Failed to create tracker")
 	defer tracker.Close()
 
 	// Add the first image
-	if err := tracker.AddImage(img1); err != nil {
-		t.Fatalf("Failed to add first image: %v", err)
-	}
+	err = tracker.AddImage(img1)
+	require.NoError(t, err, "Failed to add first image")
 
 	// Check initial tracks
 	initialTracks := tracker.GetTracks()
-	if len(initialTracks) == 0 {
-		t.Fatal("No initial tracks were created.")
-	}
-	if len(initialTracks) > maxFeatures {
-		t.Fatalf("Expected at most %d features, but got %d", maxFeatures, len(initialTracks))
-	}
+	require.NotEmpty(t, initialTracks, "No initial tracks were created.")
+	require.LessOrEqual(t, len(initialTracks), maxFeatures, "Expected at most %d features, but got %d", maxFeatures, len(initialTracks))
 	t.Logf("Found %d initial features to track.", len(initialTracks))
 
 	// Add the second image
-	if err := tracker.AddImage(img2); err != nil {
-		t.Fatalf("Failed to add second image: %v", err)
-	}
+	err = tracker.AddImage(img2)
+	require.NoError(t, err, "Failed to add second image")
 
 	// Check updated tracks
 	updatedTracks := tracker.GetTracks()
-	if len(updatedTracks) == 0 {
-		t.Fatal("All tracks were lost after the second image.")
-	}
+	require.NotEmpty(t, updatedTracks, "All tracks were lost after the second image.")
 	t.Logf("%d tracks survived.", len(updatedTracks))
 
 	// Check the motion of a surviving track
 	track := updatedTracks[0]
-	if len(track.Points) != 2 {
-		t.Fatalf("Expected track to have 2 points, but got %d", len(track.Points))
-	}
+	require.Len(t, track.Points, 2, "Expected track to have 2 points")
 
 	p1 := track.Points[0]
 	p2 := track.Points[1]
@@ -106,16 +60,14 @@ func TestTracker(t *testing.T) {
 	expectedDy := 10.0
 
 	// Allow some tolerance for the feature detection and tracking
-	if math.Abs(dx-expectedDx) > 1.0 || math.Abs(dy-expectedDy) > 1.0 {
-		t.Errorf("Expected displacement close to (%f, %f), but got (%f, %f)", expectedDx, expectedDy, dx, dy)
-	}
+	require.InDelta(t, expectedDx, dx, 1.0, "Expected displacement close to (%f, %f), but got (%f, %f)", expectedDx, expectedDy, dx, dy)
+	require.InDelta(t, expectedDy, dy, 1.0, "Expected displacement close to (%f, %f), but got (%f, %f)", expectedDx, expectedDy, dx, dy)
 
 	// Check velocity
 	// dt is implicitly 1.0, so velocity should be equal to displacement
 	vx := track.LatestVelocity.X
 	vy := track.LatestVelocity.Y
-	if math.Abs(float64(vx)-expectedDx) > 1.0 || math.Abs(float64(vy)-expectedDy) > 1.0 {
-		t.Errorf("Expected velocity close to (%f, %f), but got (%f, %f)", expectedDx, expectedDy, vx, vy)
-	}
+	require.InDelta(t, expectedDx, float64(vx), 1.0, "Expected velocity close to (%f, %f), but got (%f, %f)", expectedDx, expectedDy, vx, vy)
+	require.InDelta(t, expectedDy, float64(vy), 1.0, "Expected velocity close to (%f, %f), but got (%f, %f)", expectedDx, expectedDy, vx, vy)
 }
 
