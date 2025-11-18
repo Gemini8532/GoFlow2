@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 
 func main() {
 	// --- Command-Line Flags ---
-	numImages := flag.Int("numImages", 6, "Number of images to process from the sequence.")
 	maxFeatures := flag.Int("maxFeatures", 200, "Maximum number of features to track.")
 	smoothness := flag.Float64("smoothness", 0.5, "Smoothness threshold (max average angle change in radians).")
 	vectorScale := flag.Float64("vectorScale", 50.0, "Scaling factor for drawing velocity vectors.")
@@ -27,8 +25,16 @@ func main() {
 	extrapolate := flag.Int("extrapolate", 0, "Number of future points to extrapolate and draw.")
 	flag.Parse()
 
-	fmt.Printf("Running with parameters: numImages=%d, maxFeatures=%d, vectorScale=%.2f, minTrackLength=%d, extrapolate=%d\n",
-		*numImages, *maxFeatures, *vectorScale, *minTrackLength, *extrapolate)
+	// Get file paths from command line arguments
+	fileArgs := flag.Args()
+	if len(fileArgs) == 0 {
+		fmt.Println("Error: No input files provided.")
+		fmt.Println("Usage: go run main.go [flags] <file1.png> <file2.png> ...")
+		os.Exit(1)
+	}
+
+	fmt.Printf("Running with parameters: maxFeatures=%d, vectorScale=%.2f, minTrackLength=%d, extrapolate=%d\n",
+		*maxFeatures, *vectorScale, *minTrackLength, *extrapolate)
 	fmt.Printf("Filter type: %s\n", *filterType)
 	switch *filterType {
 	case "smoothness":
@@ -40,41 +46,12 @@ func main() {
 		fmt.Printf("Max Angle filter params: maxAngle=%.2f\n", *maxAngle)
 	}
 
-	// --- Find and Load Data ---
-	var rainfallDir string
-	possiblePaths := []string{"../../rainfall_data", "../rainfall_data", "rainfall_data"}
-	for _, path := range possiblePaths {
-		if _, err := os.Stat(path); err == nil {
-			rainfallDir = path
-			break
-		}
-	}
+	fmt.Printf("Processing %d input files\n", len(fileArgs))
 
-	if rainfallDir == "" {
-		fmt.Println("Error: rainfall_data directory not found.")
-		os.Exit(1)
-	}
-
-	files, err := os.ReadDir(rainfallDir)
-	if err != nil {
-		fmt.Printf("Error reading rainfall_data directory: %v\n", err)
-		os.Exit(1)
-	}
-
-	var imagePaths []string
-	for _, file := range files {
-		if filepath.Ext(file.Name()) == ".png" {
-			imagePaths = append(imagePaths, filepath.Join(rainfallDir, file.Name()))
-		}
-	}
-	sort.Strings(imagePaths)
-
-	if len(imagePaths) < *numImages {
-		fmt.Printf("Error: Not enough images in rainfall_data. Found %d, but need %d.\n", len(imagePaths), *numImages)
-		os.Exit(1)
-	}
-
-	testImagePaths := imagePaths[:*numImages]
+	// Sort the input files to ensure consistent processing order
+	testImagePaths := make([]string, len(fileArgs))
+	copy(testImagePaths, fileArgs)
+	sort.Strings(testImagePaths)
 
 	// --- Run Tracker ---
 	fmt.Println("Running tracker on rainfall data...")
