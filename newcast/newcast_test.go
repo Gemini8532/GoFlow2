@@ -98,15 +98,15 @@ func TestTracker(t *testing.T) {
 	p1 := track.Points[0]
 	p2 := track.Points[1]
 
-	dx := p2.Vec.X - p1.Vec.X
-	dy := p2.Vec.Y - p1.Vec.Y
+	dx := p2.X - p1.X
+	dy := p2.Y - p1.Y
 
 	// The shift in the test data is (20, 10)
-	expectedDx := float32(20.0)
-	expectedDy := float32(10.0)
+	expectedDx := 20.0
+	expectedDy := 10.0
 
 	// Allow some tolerance for the feature detection and tracking
-	if math.Abs(float64(dx-expectedDx)) > 1.0 || math.Abs(float64(dy-expectedDy)) > 1.0 {
+	if math.Abs(dx-expectedDx) > 1.0 || math.Abs(dy-expectedDy) > 1.0 {
 		t.Errorf("Expected displacement close to (%f, %f), but got (%f, %f)", expectedDx, expectedDy, dx, dy)
 	}
 
@@ -114,7 +114,7 @@ func TestTracker(t *testing.T) {
 	// dt is implicitly 1.0, so velocity should be equal to displacement
 	vx := track.LatestVelocity.X
 	vy := track.LatestVelocity.Y
-	if math.Abs(float64(vx-expectedDx)) > 1.0 || math.Abs(float64(vy-expectedDy)) > 1.0 {
+	if math.Abs(float64(vx)-expectedDx) > 1.0 || math.Abs(float64(vy)-expectedDy) > 1.0 {
 		t.Errorf("Expected velocity close to (%f, %f), but got (%f, %f)", expectedDx, expectedDy, vx, vy)
 	}
 }

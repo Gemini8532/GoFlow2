@@ -130,12 +130,12 @@ func TestTrackerWithIrregularShape(t *testing.T) {
 	}
 
 	// Check the average displacement
-	var totalDx, totalDy float32
+	var totalDx, totalDy float64
 	var validTracks int
 	for _, track := range tracks {
 		if len(track.Points) == 2 {
-			p1 := track.Points[0].Vec
-			p2 := track.Points[1].Vec
+			p1 := track.Points[0]
+			p2 := track.Points[1]
 			totalDx += p2.X - p1.X
 			totalDy += p2.Y - p1.Y
 			validTracks++
@@ -146,10 +146,10 @@ func TestTrackerWithIrregularShape(t *testing.T) {
 		t.Fatal("No tracks had 2 points to compare.")
 	}
 
-	avgDx := totalDx / float32(validTracks)
-	avgDy := totalDy / float32(validTracks)
+	avgDx := totalDx / float64(validTracks)
+	avgDy := totalDy / float64(validTracks)
 
-	if math.Abs(float64(avgDx-float32(shiftX))) > 2.0 || math.Abs(float64(avgDy-float32(shiftY))) > 2.0 {
+	if math.Abs(avgDx-float64(shiftX)) > 2.0 || math.Abs(avgDy-float64(shiftY)) > 2.0 {
 		t.Errorf("Expected average displacement close to (%d, %d), but got (%.2f, %.2f)", shiftX, shiftY, avgDx, avgDy)
 	}
 }
@@ -346,7 +346,7 @@ func TestTrackerWithSquareToTriangle(t *testing.T) {
 	// Separate initial tracks into top and base features
 	var topFeatures, baseFeatures []*Track
 	for _, track := range initialTracks {
-		if track.Points[0].Vec.Y < 100 {
+		if track.Points[0].Y < 100 {
 			topFeatures = append(topFeatures, track)
 		} else {
 			baseFeatures = append(baseFeatures, track)
@@ -370,8 +370,8 @@ func TestTrackerWithSquareToTriangle(t *testing.T) {
 		if len(track.Points) < 2 {
 			continue
 		}
-		p1 := track.Points[0].Vec
-		p2 := track.Points[1].Vec
+		p1 := track.Points[0]
+		p2 := track.Points[1]
 		dy := p2.Y - p1.Y
 
 		// Was this a top or base feature?
@@ -479,8 +479,8 @@ func TestTrackerWithRainfallData(t *testing.T) {
 	displacementsY := make([]float64, 0, len(survivingTracks))
 	for _, track := range survivingTracks {
 		if len(track.Points) == len(testImagePaths) {
-			p1 := track.Points[0].Vec
-			p_final := track.Points[len(track.Points)-1].Vec
+			p1 := track.Points[0]
+			p_final := track.Points[len(track.Points)-1]
 			displacementsX = append(displacementsX, float64(p_final.X-p1.X))
 			displacementsY = append(displacementsY, float64(p_final.Y-p1.Y))
 		}

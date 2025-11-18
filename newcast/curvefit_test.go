@@ -1,7 +1,6 @@
 package newcast
 
 import (
-	"gocv.io/x/gocv"
 	"math"
 	"testing"
 )
@@ -9,10 +8,10 @@ import (
 func TestFitQuadratic(t *testing.T) {
 	// Test case 1: Simple parabolic motion
 	points := []Point{
-		{Vec: gocv.Point2f{X: 0, Y: 0}},
-		{Vec: gocv.Point2f{X: 1, Y: 1}},
-		{Vec: gocv.Point2f{X: 4, Y: 4}},
-		{Vec: gocv.Point2f{X: 9, Y: 9}},
+		{X: 0.0, Y: 0.0},
+		{X: 1.0, Y: 1.0},
+		{X: 4.0, Y: 4.0},
+		{X: 9.0, Y: 9.0},
 	}
 
 	polyX, polyY, err := FitQuadratic(points)
@@ -45,10 +44,10 @@ func TestFitQuadratic(t *testing.T) {
 func TestFitQuadraticVelocityAcceleration(t *testing.T) {
 	// Test case: x = t^2, so velocity = 2*t, acceleration = 2
 	points := []Point{
-		{Vec: gocv.Point2f{X: 0, Y: 0}},
-		{Vec: gocv.Point2f{X: 1, Y: 0}},
-		{Vec: gocv.Point2f{X: 4, Y: 0}},
-		{Vec: gocv.Point2f{X: 9, Y: 0}},
+		{X: 0.0, Y: 0.0},
+		{X: 1.0, Y: 0.0},
+		{X: 4.0, Y: 0.0},
+		{X: 9.0, Y: 0.0},
 	}
 
 	polyX, _, err := FitQuadratic(points)
@@ -73,8 +72,8 @@ func TestFitQuadraticVelocityAcceleration(t *testing.T) {
 
 func TestFitQuadraticNotEnoughPoints(t *testing.T) {
 	points := []Point{
-		{Vec: gocv.Point2f{X: 0, Y: 0}},
-		{Vec: gocv.Point2f{X: 1, Y: 1}},
+		{X: 0.0, Y: 0.0},
+		{X: 1.0, Y: 1.0},
 	}
 
 	_, _, err := FitQuadratic(points)

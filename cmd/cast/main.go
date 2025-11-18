@@ -123,7 +123,7 @@ func main() {
 	fmt.Printf("Track visualization saved to %s\n", trackImgPath)
 
 	// Visualize final velocity vectors
-	vectorImg := newcast.VisualizeVectors(filteredTracks, width, height, float32(*vectorScale))
+	vectorImg := newcast.VisualizeVectors(filteredTracks, width, height, *vectorScale)
 	defer vectorImg.Close()
 	vectorImgPath := "rainfall_vectors.png"
 	if ok := gocv.IMWrite(vectorImgPath, vectorImg); !ok {

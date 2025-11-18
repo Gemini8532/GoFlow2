@@ -4,13 +4,8 @@ import (
 	"math"
 )
 
-// Point represents a 2D coordinate.
-type LPoint struct {
-	X, Y float64
-}
-
 // Track represents a sequence of points over time.
-type LTrack []LPoint
+type LTrack []Point
 
 // Vector represents a 2D velocity vector.
 type Vector struct {
@@ -119,8 +114,10 @@ func (fp *FlowProcessor) accumulateCell(t, x, y int, vx, vy, w float64) {
 }
 
 // ProcessTracks Phase 1: Accumulation.
-func (fp *FlowProcessor) ProcessTracks(tracks []LTrack) {
-	for _, track := range tracks {
+func (fp *FlowProcessor) ProcessTracks(tracks []Track) {
+
+	for _, ntrack := range tracks {
+		track := ntrack.Points
 		for t := 0; t < len(track)-1; t++ {
 			if t >= fp.Grid.Time {
 				break

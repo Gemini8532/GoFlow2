@@ -33,8 +33,8 @@ func FitQuadratic(points []Point) (polyX, polyY Polynomial, err error) {
 		sumT3 += t3
 		sumT4 += t4
 
-		x := float64(p.Vec.X)
-		y := float64(p.Vec.Y)
+		x := p.X
+		y := p.Y
 
 		sumX += x
 		sumTX += t * x

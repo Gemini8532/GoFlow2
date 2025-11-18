@@ -1,18 +1,17 @@
 package newcast
 
 import (
-	"gocv.io/x/gocv"
 	"testing"
 )
 
 func TestExtrapolationCalculation(t *testing.T) {
 	// Create a track with points. The time is now implicit.
 	points := []Point{
-		{Vec: gocv.Point2f{X: 0, Y: 0}}, // t=0
-		{Vec: gocv.Point2f{X: 2, Y: 1}}, // t=1
-		{Vec: gocv.Point2f{X: 4, Y: 2}}, // t=2
-		{Vec: gocv.Point2f{X: 6, Y: 3}}, // t=3
-		{Vec: gocv.Point2f{X: 8, Y: 4}}, // t=4
+		{X: 0.0, Y: 0.0}, // t=0
+		{X: 2.0, Y: 1.0}, // t=1
+		{X: 4.0, Y: 2.0}, // t=2
+		{X: 6.0, Y: 3.0}, // t=3
+		{X: 8.0, Y: 4.0}, // t=4
 	}
 
 	track := &Track{

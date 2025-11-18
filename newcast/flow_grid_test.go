@@ -1,20 +1,14 @@
 package newcast
 
 import (
-
 	"fmt"
 
 	"log"
 
 	"testing"
 
-
-
 	"github.com/stretchr/testify/assert"
-
 )
-
-
 
 var files = []string{
 
@@ -37,10 +31,7 @@ var files = []string{
 	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T14:25:00Z.png",
 
 	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T14:30:00Z.png",
-
 }
-
-
 
 func TestLow(t *testing.T) {
 
@@ -78,12 +69,12 @@ func TestMain(t *testing.T) {
 	// 1. Create Processor (allocates internal build buffers)
 	processor := NewFlowProcessor(width, height, timeFrames)
 
-	track1 := LTrack{
+	points := []Point{
 		{2.1, 2.1},
 		{3.1, 2.1},
 		{4.1, 2.1},
 	}
-	tracks := []LTrack{track1}
+	tracks := []Track{Track{Points: points}}
 
 	// 2. Run Operations
 	processor.ProcessTracks(tracks)

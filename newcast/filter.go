@@ -4,8 +4,6 @@ import (
 	"image"
 	"math"
 	"sort"
-
-	"gocv.io/x/gocv"
 )
 
 // calculateSmoothnessMetric calculates the smoothness of a track.
@@ -20,12 +18,12 @@ func calculateSmoothnessMetric(track *Track) float64 {
 	numSegments := 0
 
 	for i := 0; i < len(track.Points)-2; i++ {
-		p1 := track.Points[i].Vec
-		p2 := track.Points[i+1].Vec
-		p3 := track.Points[i+2].Vec
+		p1 := track.Points[i]
+		p2 := track.Points[i+1]
+		p3 := track.Points[i+2]
 
-		v1 := gocv.Point2f{X: p2.X - p1.X, Y: p2.Y - p1.Y}
-		v2 := gocv.Point2f{X: p3.X - p2.X, Y: p3.Y - p2.Y}
+		v1 := Point{X: p2.X - p1.X, Y: p2.Y - p1.Y}
+		v2 := Point{X: p3.X - p2.X, Y: p3.Y - p2.Y}
 
 		// Ignore zero-length vectors
 		if (v1.X == 0 && v1.Y == 0) || (v2.X == 0 && v2.Y == 0) {
@@ -68,7 +66,7 @@ func FilterTracksByDensityAndSmoothness(tracks []*Track, gridCellSize, minTracks
 		if len(track.Points) == 0 {
 			continue
 		}
-		startPoint := track.Points[0].Vec
+		startPoint := track.Points[0]
 		cellX := int(startPoint.X) / gridCellSize
 		cellY := int(startPoint.Y) / gridCellSize
 		cell := image.Point{X: cellX, Y: cellY}
@@ -116,12 +114,12 @@ func FilterTracksByMaxAngleChange(tracks []*Track, maxAngleChange float64) []*Tr
 
 		isSmooth := true
 		for i := 0; i < len(track.Points)-2; i++ {
-			p1 := track.Points[i].Vec
-			p2 := track.Points[i+1].Vec
-			p3 := track.Points[i+2].Vec
+			p1 := track.Points[i]
+			p2 := track.Points[i+1]
+			p3 := track.Points[i+2]
 
-			v1 := gocv.Point2f{X: p2.X - p1.X, Y: p2.Y - p1.Y}
-			v2 := gocv.Point2f{X: p3.X - p2.X, Y: p3.Y - p2.Y}
+			v1 := Point{X: p2.X - p1.X, Y: p2.Y - p1.Y}
+			v2 := Point{X: p3.X - p2.X, Y: p3.Y - p2.Y}
 
 			if (v1.X == 0 && v1.Y == 0) || (v2.X == 0 && v2.Y == 0) {
 				continue
@@ -143,9 +141,9 @@ func FilterTracksByMaxAngleChange(tracks []*Track, maxAngleChange float64) []*Tr
 }
 
 // angleBetween calculates the angle between two 2D vectors.
-func angleBetween(v1, v2 gocv.Point2f) float64 {
-	dot := float64(v1.X*v2.X + v1.Y*v2.Y)
-	det := float64(v1.X*v2.Y - v1.Y*v2.X) // Cross product in 2D
+func angleBetween(v1, v2 Point) float64 {
+	dot := v1.X*v2.X + v1.Y*v2.Y
+	det := v1.X*v2.Y - v1.Y*v2.X // Cross product in 2D
 	angle := math.Atan2(det, dot)
 	return angle
 }

@@ -8,15 +8,15 @@ import (
 
 // Point represents a point in space.
 type Point struct {
-	Vec gocv.Point2f
+	X, Y float64
 }
 
 // Track represents the path of a single feature over time.
 type Track struct {
 	ID                 int
 	Points             []Point
-	LatestVelocity     gocv.Point2f
-	LatestAcceleration gocv.Point2f
+	LatestVelocity     Point
+	LatestAcceleration Point
 	Lost               bool
 	PolyX              Polynomial // Polynomial for X coordinate
 	PolyY              Polynomial // Polynomial for Y coordinate
@@ -100,7 +100,7 @@ func (t *Tracker) initializeTracks(img gocv.Mat) error {
 		ptVec := points.GetVecfAt(i, 0)
 		track := &Track{
 			ID:     t.nextTrackID,
-			Points: []Point{{Vec: gocv.Point2f{X: ptVec[0], Y: ptVec[1]}}},
+			Points: []Point{{X: float64(ptVec[0]), Y: float64(ptVec[1])}},
 			Lost:   false,
 		}
 		t.tracks = append(t.tracks, track)
@@ -126,13 +126,13 @@ func (t *Tracker) updateTracks(nextPoints, status gocv.Mat) {
 			if nextPoints.Channels() == 2 {
 				ptVec := nextPoints.GetVecfAt(i, 0)
 				newPoint = Point{
-					Vec: gocv.Point2f{X: ptVec[0], Y: ptVec[1]},
+					X: float64(ptVec[0]), Y: float64(ptVec[1]),
 				}
 			} else {
 				x := nextPoints.GetFloatAt(i, 0)
 				y := nextPoints.GetFloatAt(i, 1)
 				newPoint = Point{
-					Vec: gocv.Point2f{X: x, Y: y},
+					X: float64(x), Y: float64(y),
 				}
 			}
 			track.Points = append(track.Points, newPoint)
@@ -155,9 +155,9 @@ func (t *Tracker) updatePrevPoints() {
 
 	newPoints := gocv.NewMatWithSize(len(t.tracks), 2, gocv.MatTypeCV32F)
 	for i, track := range t.tracks {
-		lastPoint := track.Points[len(track.Points)-1].Vec
-		newPoints.SetFloatAt(i, 0, lastPoint.X)
-		newPoints.SetFloatAt(i, 1, lastPoint.Y)
+		lastPoint := track.Points[len(track.Points)-1]
+		newPoints.SetFloatAt(i, 0, float32(lastPoint.X))
+		newPoints.SetFloatAt(i, 1, float32(lastPoint.Y))
 	}
 	t.prevPoints = newPoints
 }
@@ -178,13 +178,13 @@ func (t *Tracker) estimateMotion(track *Track) {
 			track.PolyY = polyY
 			lastT := float64(numPoints - 1)
 
-			vx := float32(polyX.Velocity(lastT))
-			vy := float32(polyY.Velocity(lastT))
-			track.LatestVelocity = gocv.Point2f{X: vx, Y: vy}
+			vx := polyX.Velocity(lastT)
+			vy := polyY.Velocity(lastT)
+			track.LatestVelocity = Point{X: vx, Y: vy}
 
-			ax := float32(polyX.Acceleration())
-			ay := float32(polyY.Acceleration())
-			track.LatestAcceleration = gocv.Point2f{X: ax, Y: ay}
+			ax := polyX.Acceleration()
+			ay := polyY.Acceleration()
+			track.LatestAcceleration = Point{X: ax, Y: ay}
 			return
 		}
 	}
@@ -192,23 +192,23 @@ func (t *Tracker) estimateMotion(track *Track) {
 	// Fallback to simple finite differences if curve fitting fails or not enough points
 	p1 := track.Points[numPoints-1]
 	p0 := track.Points[numPoints-2]
-	dt := float32(1.0)
-	vx := (p1.Vec.X - p0.Vec.X) / dt
-	vy := (p1.Vec.Y - p0.Vec.Y) / dt
-	track.LatestVelocity = gocv.Point2f{X: vx, Y: vy}
+	dt := 1.0
+	vx := (p1.X - p0.X) / dt
+	vy := (p1.Y - p0.Y) / dt
+	track.LatestVelocity = Point{X: vx, Y: vy}
 
 	if numPoints < 3 {
 		return
 	}
 	p_minus_1 := track.Points[numPoints-3]
-	dt_prev := float32(1.0)
-	vx_prev := (p0.Vec.X - p_minus_1.Vec.X) / dt_prev
-	vy_prev := (p0.Vec.Y - p_minus_1.Vec.Y) / dt_prev
+	dt_prev := 1.0
+	vx_prev := (p0.X - p_minus_1.X) / dt_prev
+	vy_prev := (p0.Y - p_minus_1.Y) / dt_prev
 
 	avg_dt := (dt + dt_prev) / 2.0
-	ax := (track.LatestVelocity.X - vx_prev) / float32(avg_dt)
-	ay := (track.LatestVelocity.Y - vy_prev) / float32(avg_dt)
-	track.LatestAcceleration = gocv.Point2f{X: ax, Y: ay}
+	ax := (vx - vx_prev) / avg_dt
+	ay := (vy - vy_prev) / avg_dt
+	track.LatestAcceleration = Point{X: ax, Y: ay}
 }
 
 // GetTracks returns the current set of active tracks.

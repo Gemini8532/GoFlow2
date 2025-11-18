@@ -28,8 +28,8 @@ func VisualizeTracks(tracks []*Track, width, height int) gocv.Mat {
 
 		// Draw lines between consecutive points in the track
 		for j := 0; j < len(track.Points)-1; j++ {
-			p1 := image.Point{int(track.Points[j].Vec.X), int(track.Points[j].Vec.Y)}
-			p2 := image.Point{int(track.Points[j+1].Vec.X), int(track.Points[j+1].Vec.Y)}
+			p1 := image.Point{int(track.Points[j].X), int(track.Points[j].Y)}
+			p2 := image.Point{int(track.Points[j+1].X), int(track.Points[j+1].Y)}
 			gocv.Line(&img, p1, p2, c, 2)
 		}
 	}
@@ -84,17 +84,17 @@ func VisualizeExtrapolatedTracks(tracks []*Track, width, height, numFuturePoints
 			for j := 0; j < len(allPoints)-1; j++ {
 				gocv.Line(&img, allPoints[j], allPoints[j+1], c, 2)
 			}
-			
+
 			// Draw original track data points as circles to distinguish them from extrapolated path
 			for j := 0; j < len(track.Points); j++ {
-				center := image.Point{int(track.Points[j].Vec.X), int(track.Points[j].Vec.Y)}  // Actual original point
-				gocv.Circle(&img, center, 4, c, 2)  // Draw circle with radius 4
+				center := image.Point{int(track.Points[j].X), int(track.Points[j].Y)} // Actual original point
+				gocv.Circle(&img, center, 4, c, 2)                                    // Draw circle with radius 4
 			}
 		} else {
 			// If no extrapolation is possible, just draw the original track as solid
 			for j := 0; j < len(track.Points)-1; j++ {
-				p1 := image.Point{int(track.Points[j].Vec.X), int(track.Points[j].Vec.Y)}
-				p2 := image.Point{int(track.Points[j+1].Vec.X), int(track.Points[j+1].Vec.Y)}
+				p1 := image.Point{int(track.Points[j].X), int(track.Points[j].Y)}
+				p2 := image.Point{int(track.Points[j+1].X), int(track.Points[j+1].Y)}
 				gocv.Line(&img, p1, p2, c, 2)
 			}
 		}
@@ -104,7 +104,7 @@ func VisualizeExtrapolatedTracks(tracks []*Track, width, height, numFuturePoints
 }
 
 // VisualizeVectors draws the final velocity vectors of the tracks.
-func VisualizeVectors(tracks []*Track, width, height int, scale float32) gocv.Mat {
+func VisualizeVectors(tracks []*Track, width, height int, scale float64) gocv.Mat {
 	img := gocv.NewMatWithSize(height, width, gocv.MatTypeCV8UC3)
 	img.SetTo(gocv.NewScalar(0, 0, 0, 0)) // Black background
 
@@ -114,12 +114,12 @@ func VisualizeVectors(tracks []*Track, width, height int, scale float32) gocv.Ma
 		}
 
 		lastPoint := track.Points[len(track.Points)-1]
-		p1 := image.Point{int(lastPoint.Vec.X), int(lastPoint.Vec.Y)}
+		p1 := image.Point{int(lastPoint.X), int(lastPoint.Y)}
 
 		// Calculate the endpoint of the velocity vector
 		p2 := image.Point{
-			int(lastPoint.Vec.X + track.LatestVelocity.X*scale),
-			int(lastPoint.Vec.Y + track.LatestVelocity.Y*scale),
+			int(lastPoint.X + track.LatestVelocity.X*scale),
+			int(lastPoint.Y + track.LatestVelocity.Y*scale),
 		}
 
 		gocv.ArrowedLine(&img, p1, p2, color.RGBA{R: 0, G: 255, B: 0, A: 255}, 2)
