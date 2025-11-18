@@ -226,20 +226,20 @@ export default function App() {
       // ---------------------------------------------------------
       // SWITCH HERE: To use your real Go server, uncomment below:
       // ---------------------------------------------------------
-      /*
+      const id = "123";
       try {
-        const response = await fetch(`http://localhost:8080/vectors?t=${timeStep}`);
+        const response = await fetch(`http://localhost:9093/vector-frame?id=${id}&t=${timeStep}`);
         const blob = await response.blob();
         const frame = await unmarshalVectorFrame(blob);
         if (isMounted) setCurrentFrame(frame);
       } catch (e) {
         console.error("Failed to load frame", e);
       }
-      */
+
 
       // --- DEMO MODE: Generating math data locally ---
-      const mock = generateMockFrame(timeStep, 256, 256);
-      if (isMounted) setCurrentFrame(mock);
+      //const mock = generateMockFrame(timeStep, 256, 256);
+      //if (isMounted) setCurrentFrame(mock);
     };
 
     loadFrame();
