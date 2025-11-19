@@ -11,26 +11,8 @@ import (
 )
 
 var files = []string{
-
-	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T13:45:00Z.png",
-
-	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T13:50:00Z.png",
-
-	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T13:55:00Z.png",
-
-	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T14:00:00Z.png",
-
-	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T14:05:00Z.png",
-
-	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T14:10:00Z.png",
-
-	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T14:15:00Z.png",
-
-	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T14:20:00Z.png",
-
-	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T14:25:00Z.png",
-
-	"/home/jdp/maps/weather/uk/2025-11-18/2025-11-18T14:30:00Z.png",
+	"../test_data/centered.png",
+	"../test_data/shifted.png",
 }
 
 func TestLow(t *testing.T) {

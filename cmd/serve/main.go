@@ -11,15 +11,24 @@ import (
 	"example/goflow/newcast" // Adjust this import path if your module name is different
 )
 
+// Add a struct to hold the data needed for track visualization
+type TrackVisuals struct {
+	Tracks []*newcast.Track
+	Width  int
+	Height int
+}
+
 // Define a struct to hold the global state for our server
 type Server struct {
-	flowGrids map[string]*newcast.FlowGrid
-	mu        sync.RWMutex
+	flowGrids    map[string]*newcast.FlowGrid
+	trackVisuals map[string]TrackVisuals
+	mu           sync.RWMutex
 }
 
 func NewServer() *Server {
 	return &Server{
-		flowGrids: make(map[string]*newcast.FlowGrid),
+		flowGrids:    make(map[string]*newcast.FlowGrid),
+		trackVisuals: make(map[string]TrackVisuals),
 	}
 }
 
@@ -92,9 +101,14 @@ func (s *Server) processHandler(w http.ResponseWriter, r *http.Request) {
 
 	s.mu.Lock()
 	s.flowGrids[req.ID] = flowProcessor.Grid
+	s.trackVisuals[req.ID] = TrackVisuals{
+		Tracks: filteredTracks,
+		Width:  width,
+		Height: height,
+	}
 	s.mu.Unlock()
 
-	log.Printf("FlowGrid for ID %s generated and stored successfully.", req.ID)
+	log.Printf("FlowGrid and track visuals for ID %s generated and stored successfully.", req.ID)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "FlowGrid generated and stored"})
 }
@@ -165,11 +179,56 @@ func (s *Server) vectorFrameHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Served vector frame for ID: %s, time: %d", id, t)
 }
 
+func (s *Server) trackVisHandler(w http.ResponseWriter, r *http.Request) {
+	// 1. CORS Headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if r.Method != "GET" {
+		http.Error(w, "Only GET method is supported", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "ID is a required query parameter", http.StatusBadRequest)
+		return
+	}
+
+	s.mu.RLock()
+	visuals, ok := s.trackVisuals[id]
+	s.mu.RUnlock()
+
+	if !ok {
+		http.Error(w, fmt.Sprintf("No track visualization data found for ID: %s", id), http.StatusNotFound)
+		return
+	}
+
+	trackImg := newcast.VisualizeTracks(visuals.Tracks, visuals.Width, visuals.Height)
+	defer trackImg.Close()
+
+	buf, err := newcast.MatToPNG(trackImg)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode visualization to PNG: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/png")
+	w.Write(buf)
+	log.Printf("Served track visualization for ID: %s", id)
+}
+
 func main() {
 	server := NewServer()
 
 	http.HandleFunc("/process", server.processHandler)
 	http.HandleFunc("/vector-frame", server.vectorFrameHandler)
+	http.HandleFunc("/tracks-visualization", server.trackVisHandler)
 
 	fmt.Println("Serving vector data API on :9093")
 	log.Fatal(http.ListenAndServe(":9093", nil))

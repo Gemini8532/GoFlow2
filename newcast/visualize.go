@@ -7,6 +7,16 @@ import (
 	"gocv.io/x/gocv"
 )
 
+// MatToPNG converts a gocv.Mat to a PNG byte buffer.
+func MatToPNG(img gocv.Mat) ([]byte, error) {
+	buf, err := gocv.IMEncode(".png", img)
+	if err != nil {
+		return nil, err
+	}
+	defer buf.Close()
+	return buf.GetBytes(), nil
+}
+
 // VisualizeTracks draws the paths of the tracks on a black background.
 // Each track is drawn in a different color.
 func VisualizeTracks(tracks []*Track, width, height int) gocv.Mat {
