@@ -18,17 +18,21 @@ type TrackVisuals struct {
 	Height int
 }
 
+// RequestData holds all the data associated with a single processing request.
+type RequestData struct {
+	FlowGrid *newcast.FlowGrid
+	Visuals  TrackVisuals
+}
+
 // Define a struct to hold the global state for our server
 type Server struct {
-	flowGrids    map[string]*newcast.FlowGrid
-	trackVisuals map[string]TrackVisuals
-	mu           sync.RWMutex
+	requests map[string]*RequestData
+	mu       sync.RWMutex
 }
 
 func NewServer() *Server {
 	return &Server{
-		flowGrids:    make(map[string]*newcast.FlowGrid),
-		trackVisuals: make(map[string]TrackVisuals),
+		requests: make(map[string]*RequestData),
 	}
 }
 
@@ -97,14 +101,16 @@ func (s *Server) processHandler(w http.ResponseWriter, r *http.Request) {
 	flowProcessor := newcast.NewFlowProcessor(width, height, numTimeSteps)
 	flowProcessor.ProcessTracks(filteredTracks)
 	flowProcessor.CalculateAverages()
-	flowProcessor.FillGaps(1) // Fill gaps with a radius of 1
+	flowProcessor.FillGaps() // Fill all empty space
 
 	s.mu.Lock()
-	s.flowGrids[req.ID] = flowProcessor.Grid
-	s.trackVisuals[req.ID] = TrackVisuals{
-		Tracks: filteredTracks,
-		Width:  width,
-		Height: height,
+	s.requests[req.ID] = &RequestData{
+		FlowGrid: flowProcessor.Grid,
+		Visuals: TrackVisuals{
+			Tracks: filteredTracks,
+			Width:  width,
+			Height: height,
+		},
 	}
 	s.mu.Unlock()
 
@@ -144,13 +150,14 @@ func (s *Server) vectorFrameHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.mu.RLock()
-	flowGrid, ok := s.flowGrids[id]
+	requestData, ok := s.requests[id]
 	s.mu.RUnlock()
 
 	if !ok {
-		http.Error(w, fmt.Sprintf("No FlowGrid found for ID: %s", id), http.StatusNotFound)
+		http.Error(w, fmt.Sprintf("No data found for ID: %s", id), http.StatusNotFound)
 		return
 	}
+	flowGrid := requestData.FlowGrid
 
 	if t < 0 || t >= flowGrid.Time {
 		http.Error(w, fmt.Sprintf("Time index %d out of bounds (0 to %d)", t, flowGrid.Time-1), http.StatusBadRequest)
@@ -167,6 +174,27 @@ func (s *Server) vectorFrameHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Copy the relevant time slice data into the frame
 	copy(frame.Data, flowGrid.Data[startIndex:endIndex])
+
+	// Handle resizing
+	heightStr := r.URL.Query().Get("height")
+	if heightStr != "" {
+		height, err := strconv.Atoi(heightStr)
+		if err != nil {
+			http.Error(w, "Invalid height parameter", http.StatusBadRequest)
+			return
+		}
+		if height > 0 {
+			aspectRatio := float64(flowGrid.Width) / float64(flowGrid.Height)
+			width := int(float64(height) * aspectRatio)
+			frame = frame.Resize(width, height)
+		}
+	} else {
+		// Default resizing if no height is specified
+		aspectRatio := float64(flowGrid.Width) / float64(flowGrid.Height)
+		height := 256
+		width := int(float64(height) * aspectRatio)
+		frame = frame.Resize(width, height)
+	}
 
 	pngBytes, err := frame.MarshalPNG()
 	if err != nil {
@@ -201,13 +229,14 @@ func (s *Server) trackVisHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.mu.RLock()
-	visuals, ok := s.trackVisuals[id]
+	requestData, ok := s.requests[id]
 	s.mu.RUnlock()
 
 	if !ok {
 		http.Error(w, fmt.Sprintf("No track visualization data found for ID: %s", id), http.StatusNotFound)
 		return
 	}
+	visuals := requestData.Visuals
 
 	trackImg := newcast.VisualizeTracks(visuals.Tracks, visuals.Width, visuals.Height)
 	defer trackImg.Close()

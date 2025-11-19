@@ -1,13 +1,12 @@
-
 package newcast
 
 import (
+	"log"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-<<<<<<< HEAD
 var files = []string{
 	"../test_data/centered.png",
 	"../test_data/shifted.png",
@@ -43,14 +42,8 @@ func TestLow(t *testing.T) {
 
 }
 
-func TestMain(t *testing.T) {
-	width, height, timeFrames := 100, 100, 5
-
-	// 1. Create Processor (allocates internal build buffers)
-=======
 func TestConstantFlow(t *testing.T) {
 	width, height, timeFrames := 10, 10, 2
->>>>>>> origin/improve-flow-grid-tests
 	processor := NewFlowProcessor(width, height, timeFrames)
 
 	// A single track moving diagonally with constant velocity
@@ -65,7 +58,7 @@ func TestConstantFlow(t *testing.T) {
 	// Run all processing steps
 	processor.ProcessTracks(tracks)
 	processor.CalculateAverages()
-	processor.FillGaps(10) // Large enough to fill the whole grid
+	processor.FillGaps() // Large enough to fill the whole grid
 
 	// Verification
 	resultGrid := processor.Grid
@@ -97,7 +90,7 @@ func TestMultipleFlows(t *testing.T) {
 
 	processor.ProcessTracks(tracks)
 	processor.CalculateAverages()
-	processor.FillGaps(20) // Fill the whole grid
+	processor.FillGaps() // Fill the whole grid
 
 	resultGrid := processor.Grid
 	tFrame := 0 // Check the first time frame

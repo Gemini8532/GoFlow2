@@ -142,35 +142,25 @@ func (fp *FlowProcessor) CalculateAverages() {
 	}
 }
 
-type queueItem struct {
-	idx   int
-	depth int
-}
-
 // FillGaps Phase 3: Interpolation.
 // Reads from Grid.Data/buildData.IsSet, Writes to Grid.Data.
-func (fp *FlowProcessor) FillGaps(maxDist int) {
-	if maxDist <= 0 {
-		return
-	}
-
-	queue := make([]queueItem, 0, len(fp.activeIndices)*4)
+func (fp *FlowProcessor) FillGaps() {
+	queue := make([]int, 0, len(fp.activeIndices)*4)
 	inQueue := make(map[int]bool)
 
 	// Seed from active indices
 	for idx := range fp.activeIndices {
 		if fp.buildData[idx].IsSet {
 			x, y, t := fp.getCoords(idx)
-			fp.enqueueEmptyNeighbors(t, x, y, 1, maxDist, &queue, inQueue)
+			fp.enqueueEmptyNeighbors(t, x, y, &queue, inQueue)
 		}
 	}
 
 	head := 0
 	for head < len(queue) {
-		item := queue[head]
+		idx := queue[head]
 		head++
 
-		idx := item.idx
 		x, y, t := fp.getCoords(idx)
 
 		// Check neighbors (read from Grid.Data, check IsSet via buildData)
@@ -182,17 +172,14 @@ func (fp *FlowProcessor) FillGaps(maxDist int) {
 
 			// Update Build State (so this cell can help fill others)
 			fp.buildData[idx].IsSet = true
-			// We don't need to update Sum/Weight or ActiveIndices here
-			// because IsSet is the only flag used for the rest of FillGaps.
 
-			if item.depth < maxDist {
-				fp.enqueueEmptyNeighbors(t, x, y, item.depth+1, maxDist, &queue, inQueue)
-			}
+			// Enqueue its neighbors
+			fp.enqueueEmptyNeighbors(t, x, y, &queue, inQueue)
 		}
 	}
 }
 
-func (fp *FlowProcessor) enqueueEmptyNeighbors(t, cx, cy, depth, maxDist int, queue *[]queueItem, inQueue map[int]bool) {
+func (fp *FlowProcessor) enqueueEmptyNeighbors(t, cx, cy int, queue *[]int, inQueue map[int]bool) {
 	for dy := -1; dy <= 1; dy++ {
 		for dx := -1; dx <= 1; dx++ {
 			if dx == 0 && dy == 0 {
@@ -206,7 +193,7 @@ func (fp *FlowProcessor) enqueueEmptyNeighbors(t, cx, cy, depth, maxDist int, qu
 				// Check validity using buildData, queue uniqueness using inQueue
 				if !fp.buildData[idx].IsSet && !inQueue[idx] {
 					inQueue[idx] = true
-					*queue = append(*queue, queueItem{idx: idx, depth: depth})
+					*queue = append(*queue, idx)
 				}
 			}
 		}
