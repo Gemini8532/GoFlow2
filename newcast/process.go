@@ -17,6 +17,7 @@ type ProcessConfig struct {
 	MinTracksPerCell int
 	MaxTracksPerCell int
 	MinTrackLength   int
+	BlurSigma        float64 // Gaussian blur sigma for flow grid smoothing (0 = no blur)
 }
 
 // ProcessFilesToTracks takes a list of file paths and processing configuration,

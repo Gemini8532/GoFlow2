@@ -2,13 +2,15 @@ package newcast
 
 import (
 	"fmt"
+	"image"
 
 	"gocv.io/x/gocv"
 )
 
 // GenerateFlowGridFromTracks creates a flow grid directly from raw tracks without pre-averaging.
 // This preserves spatial accuracy by using all track points.
-func GenerateFlowGridFromTracks(tracks []*Track, origWidth, origHeight int) *AverageFlowGrid {
+// blurSigma: if > 0, applies Gaussian blur with this sigma value (0 = no blur)
+func GenerateFlowGridFromTracks(tracks []*Track, origWidth, origHeight int, blurSigma float64) *AverageFlowGrid {
 	// Always work at 256x256 to avoid resize artifacts
 	const workWidth = 256
 	const workHeight = 256
@@ -111,13 +113,38 @@ func GenerateFlowGridFromTracks(tracks []*Track, origWidth, origHeight int) *Ave
 	defer filledVx.Close()
 	defer filledVy.Close()
 
-	// Copy results directly (no resize)
-	for y := 0; y < workHeight; y++ {
-		for x := 0; x < workWidth; x++ {
-			idx := y*workWidth + x
-			vx := float64(filledVx.GetFloatAt(y, x))
-			vy := float64(filledVy.GetFloatAt(y, x))
-			grid.Data[idx] = Vector{Vx: vx, Vy: vy}
+	// Optional: Apply Gaussian blur for additional smoothing
+	if blurSigma > 0 {
+		blurredVx := gocv.NewMat()
+		blurredVy := gocv.NewMat()
+		defer blurredVx.Close()
+		defer blurredVy.Close()
+
+		// Apply Gaussian blur - kernel size based on sigma (typically 3*sigma)
+		kernelSize := int(blurSigma*3) | 1 // Ensure odd number
+		if kernelSize < 3 {
+			kernelSize = 3
+		}
+		gocv.GaussianBlur(filledVx, &blurredVx, image.Point{X: kernelSize, Y: kernelSize}, blurSigma, blurSigma, gocv.BorderDefault)
+		gocv.GaussianBlur(filledVy, &blurredVy, image.Point{X: kernelSize, Y: kernelSize}, blurSigma, blurSigma, gocv.BorderDefault)
+		// Copy results from blurred versions
+		for y := 0; y < workHeight; y++ {
+			for x := 0; x < workWidth; x++ {
+				idx := y*workWidth + x
+				vx := float64(blurredVx.GetFloatAt(y, x))
+				vy := float64(blurredVy.GetFloatAt(y, x))
+				grid.Data[idx] = Vector{Vx: vx, Vy: vy}
+			}
+		}
+	} else {
+		// Copy results directly (no blur)
+		for y := 0; y < workHeight; y++ {
+			for x := 0; x < workWidth; x++ {
+				idx := y*workWidth + x
+				vx := float64(filledVx.GetFloatAt(y, x))
+				vy := float64(filledVy.GetFloatAt(y, x))
+				grid.Data[idx] = Vector{Vx: vx, Vy: vy}
+			}
 		}
 	}
 

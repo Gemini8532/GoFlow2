@@ -30,6 +30,7 @@ func main() {
 	serverURL := flag.String("serverURL", "", "URL of the processing server (e.g., http://localhost:8080). If provided, processing is done remotely.")
 	requestID := flag.String("id", "", "Optional: A custom ID for the remote processing request. Only used with -serverURL.")
 	gridType := flag.String("gridType", "flow", "Type of grid to generate: 'flow' or 'average'.")
+	blurSigma := flag.Float64("blurSigma", 0.0, "Gaussian blur sigma for flow grid smoothing (0 = no blur, 1.0 = light, 2.0 = medium).")
 	flag.Parse()
 
 	fileArgs := flag.Args()
@@ -48,6 +49,7 @@ func main() {
 		MinTracksPerCell: *minTracksPerCell,
 		MaxTracksPerCell: *maxTracksPerCell,
 		MinTrackLength:   *minTrackLength,
+		BlurSigma:        *blurSigma,
 	}
 
 	if *serverURL != "" {
@@ -128,14 +130,14 @@ func processRemotely(serverURL string, requestID string, gridType string, fileAr
 		}
 		absFileArgs[i] = absPath
 	}
-	
+
 	reqBody := map[string]interface{}{
 		"filenames": absFileArgs,
 		"id":        requestID,
 		"config":    config,
 		"gridType":  gridType,
 	}
-	
+
 	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
 		fmt.Printf("Error marshalling request body: %v\n", err)
@@ -158,7 +160,7 @@ func processRemotely(serverURL string, requestID string, gridType string, fileAr
 	}
 
 	fmt.Printf("Successfully submitted processing request with ID: %s\n", requestID)
-	
+
 	switch gridType {
 	case "average":
 		fmt.Println("\nTo fetch the average flow grid, use the following command:")

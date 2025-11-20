@@ -113,7 +113,8 @@ func (s *Server) processHandler(w http.ResponseWriter, r *http.Request) {
 	case "average":
 		log.Println("Generating AverageFlowGrid from tracks directly")
 		// Use all track points directly for better spatial accuracy
-		averageFlowGrid := newcast.GenerateFlowGridFromTracks(filteredTracks, width, height)
+		// blurSigma from config: 0 = no blur, 1.0 = light blur, 2.0 = medium blur
+		averageFlowGrid := newcast.GenerateFlowGridFromTracks(filteredTracks, width, height, config.BlurSigma)
 		requestData.AverageFlowGrid = averageFlowGrid
 	default: // "flow" or empty
 		log.Println("Generating FlowGrid")
