@@ -112,9 +112,17 @@ func (s *Server) processHandler(w http.ResponseWriter, r *http.Request) {
 	switch req.GridType {
 	case "average":
 		log.Println("Generating AverageFlowGrid from tracks directly")
-		// Use all track points directly for better spatial accuracy
+
+		// Optionally use fitted points instead of raw points for smoother results
+		tracksToUse := filteredTracks
+		if config.UseFittedPoints {
+			log.Println("Using polynomial-fitted points instead of raw tracked points")
+			tracksToUse = newcast.ReplacWithFittedPoints(filteredTracks)
+			log.Printf("Fitted points: %d tracks (from %d raw tracks)", len(tracksToUse), len(filteredTracks))
+		}
+
 		// blurSigma from config: 0 = no blur, 1.0 = light blur, 2.0 = medium blur
-		averageFlowGrid := newcast.GenerateFlowGridFromTracks(filteredTracks, width, height, config.BlurSigma)
+		averageFlowGrid := newcast.GenerateFlowGridFromTracks(tracksToUse, width, height, config.BlurSigma)
 		requestData.AverageFlowGrid = averageFlowGrid
 	default: // "flow" or empty
 		log.Println("Generating FlowGrid")

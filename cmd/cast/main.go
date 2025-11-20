@@ -20,7 +20,7 @@ func main() {
 	maxFeatures := flag.Int("maxFeatures", 200, "Maximum number of features to track.")
 	smoothness := flag.Float64("smoothness", 0.5, "Smoothness threshold (max average angle change in radians).")
 	vectorScale := flag.Float64("vectorScale", 50.0, "Scaling factor for drawing velocity vectors.")
-	filterType := flag.String("filterType", "smoothness", "Type of filter to use: 'smoothness', 'density', or 'max_angle'.")
+	filterType := flag.String("filterType", "smoothness", "Type of filter to use: 'smoothness', 'density', 'max_angle', or 'curvefit'.")
 	maxAngle := flag.Float64("maxAngle", 0.8, "Maximum allowed angle change (in radians) for the max_angle filter.")
 	gridCellSize := flag.Int("gridCellSize", 64, "Grid cell size for density filter.")
 	minTracksPerCell := flag.Int("minTracksPerCell", 2, "Minimum number of tracks in a cell to be considered dense.")
@@ -31,6 +31,14 @@ func main() {
 	requestID := flag.String("id", "", "Optional: A custom ID for the remote processing request. Only used with -serverURL.")
 	gridType := flag.String("gridType", "flow", "Type of grid to generate: 'flow' or 'average'.")
 	blurSigma := flag.Float64("blurSigma", 0.0, "Gaussian blur sigma for flow grid smoothing (0 = no blur, 1.0 = light, 2.0 = medium).")
+	useFittedPoints := flag.Bool("useFittedPoints", false, "Use polynomial-fitted points instead of raw tracked points (reduces noise).")
+
+	// Curve-fit filtering parameters
+	minRSquared := flag.Float64("minRSquared", 0.85, "Minimum R² for curve-fit filter (0-1, higher = stricter).")
+	maxRMSE := flag.Float64("maxRMSE", 3.0, "Maximum RMSE in pixels for curve-fit filter.")
+	maxDeviation := flag.Float64("maxDeviation", 8.0, "Maximum deviation from fitted curve in pixels.")
+	maxAcceleration := flag.Float64("maxAcceleration", 2.0, "Maximum acceleration in pixels/frame² for curve-fit filter.")
+
 	flag.Parse()
 
 	fileArgs := flag.Args()
@@ -50,6 +58,11 @@ func main() {
 		MaxTracksPerCell: *maxTracksPerCell,
 		MinTrackLength:   *minTrackLength,
 		BlurSigma:        *blurSigma,
+		UseFittedPoints:  *useFittedPoints,
+		MinRSquared:      *minRSquared,
+		MaxRMSE:          *maxRMSE,
+		MaxDeviation:     *maxDeviation,
+		MaxAcceleration:  *maxAcceleration,
 	}
 
 	if *serverURL != "" {

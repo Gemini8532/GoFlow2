@@ -110,7 +110,6 @@ func copyMatrix(m [][]float64) [][]float64 {
 	return c
 }
 
-
 // Eval evaluates the polynomial at a given time t.
 func (p *Polynomial) Eval(t float64) float64 {
 	return p.A*t*t + p.B*t + p.C
@@ -124,4 +123,48 @@ func (p *Polynomial) Velocity(t float64) float64 {
 // Acceleration evaluates the acceleration (second derivative) of the polynomial.
 func (p *Polynomial) Acceleration() float64 {
 	return 2 * p.A
+}
+
+// ReplaceWithFittedPoints replaces the raw tracked points with polynomial-fitted points.
+// This reduces tracking noise and produces smoother trajectories.
+// The polynomial must already be fitted (PolyX and PolyY must be set).
+func ReplacWithFittedPoints(tracks []*Track) []*Track {
+	fittedTracks := make([]*Track, 0, len(tracks))
+
+	for _, track := range tracks {
+		// Fit polynomial if not already done
+		polyX := track.PolyX
+		polyY := track.PolyY
+
+		if polyX.A == 0 && polyX.B == 0 && polyX.C == 0 {
+			// Polynomial not fitted yet, fit it now
+			var err error
+			polyX, polyY, err = FitQuadratic(track.Points)
+			if err != nil {
+				// Can't fit, skip this track
+				continue
+			}
+		}
+
+		// Create new track with fitted points
+		fittedTrack := &Track{
+			ID:     track.ID,
+			Points: make([]Point, len(track.Points)),
+			PolyX:  polyX,
+			PolyY:  polyY,
+		}
+
+		// Replace each point with its fitted position
+		for i := range track.Points {
+			t := float64(i)
+			fittedTrack.Points[i] = Point{
+				X: polyX.Eval(t),
+				Y: polyY.Eval(t),
+			}
+		}
+
+		fittedTracks = append(fittedTracks, fittedTrack)
+	}
+
+	return fittedTracks
 }
