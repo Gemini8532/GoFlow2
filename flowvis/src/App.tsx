@@ -19,49 +19,31 @@ interface Frame {
  * Note: In a real browser environment fetching from a server, 
  * createImageBitmap with { premultiplyAlpha: 'none' } is essential.
  */
+// Decode binary vector frame format
+// Format: 4 bytes width (int32), 4 bytes height (int32), then width*height*2 float32 values
 async function unmarshalVectorFrame(blob: Blob): Promise<Frame> {
-  const bitmap = await createImageBitmap(blob, {
-    premultiplyAlpha: 'none',
-    colorSpaceConversion: 'none',
-    resizeQuality: 'pixelated',
-  });
+  const arrayBuffer = await blob.arrayBuffer();
+  const dataView = new DataView(arrayBuffer);
 
-  const width = bitmap.width;
-  const height = bitmap.height;
+  // Read dimensions (little endian int32)
+  const width = dataView.getInt32(0, true);
+  const height = dataView.getInt32(4, true);
 
-  // Use an offscreen canvas to extract raw bytes
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (!ctx) throw new Error("No Canvas Context");
-
-  ctx.drawImage(bitmap, 0, 0);
-  const imgData = ctx.getImageData(0, 0, width, height);
-  const pixels = imgData.data;
-
+  // Read vector data (little endian float32)
   const vectorData = new Float32Array(width * height * 2);
+  let offset = 8; // After width and height
 
-  for (let i = 0; i < width * height; i++) {
-    const pIdx = i * 4;
-    const vIdx = i * 2;
+  for (let i = 0; i < width * height * 2; i++) {
+    vectorData[i] = dataView.getFloat32(offset, true);
+    offset += 4;
+  }
 
-    // Extract bytes
-    const r = pixels[pIdx];     // X High
-    const g = pixels[pIdx + 1]; // X Low
-    const b = pixels[pIdx + 2]; // Y High
-    const a = pixels[pIdx + 3]; // Y Low
+  console.log(`Decoded binary frame: ${width}x${height}, ${vectorData.length} floats`);
 
-    // Reconstruct uint16
-    let xUint = (r << 8) | g;
-    let yUint = (b << 8) | a;
-
-    // Handle Two's Complement for int16 range (-32768 to 32767)
-    const xInt = xUint > 32767 ? xUint - 65536 : xUint;
-    const yInt = yUint > 32767 ? yUint - 65536 : yUint;
-
-    vectorData[vIdx] = xInt / SCALE_FACTOR;
-    vectorData[vIdx + 1] = yInt / SCALE_FACTOR;
+  // Debug: log pixel (48, 144)
+  const debugIdx = (144 * width + 48) * 2;
+  if (debugIdx < vectorData.length) {
+    console.log(`DECODED BINARY pixel (48,144): vx=${vectorData[debugIdx].toFixed(2)}, vy=${vectorData[debugIdx + 1].toFixed(2)}`);
   }
 
   return { width, height, data: vectorData };
@@ -115,7 +97,7 @@ const VectorCanvas = ({
   frame: Frame | null,
   stride: number,
   scale: number,
-  onHover: (x: number, y: number, vx: number, vy: number) => void
+  onHover: (x: number, y: number, vx: number, vy: number, avgVx?: number, avgVy?: number) => void
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -128,7 +110,31 @@ const VectorCanvas = ({
 
     if (x >= 0 && x < frame.width && y >= 0 && y < frame.height) {
       const idx = (y * frame.width + x) * 2;
-      onHover(x, y, frame.data[idx], frame.data[idx + 1]);
+      const rawVx = frame.data[idx];
+      const rawVy = frame.data[idx + 1];
+
+      // Find the nearest drawn vector (sampled at stride intervals)
+      const drawnX = Math.floor(x / stride) * stride;
+      const drawnY = Math.floor(y / stride) * stride;
+
+      let drawnVx = rawVx;
+      let drawnVy = rawVy;
+
+      if (drawnX >= 0 && drawnX < frame.width && drawnY >= 0 && drawnY < frame.height) {
+        const drawnIdx = (drawnY * frame.width + drawnX) * 2;
+        drawnVx = frame.data[drawnIdx];
+        drawnVy = frame.data[drawnIdx + 1];
+
+        // Debug: log when there's a big difference
+        const rawMag = Math.sqrt(rawVx * rawVx + rawVy * rawVy);
+        const drawnMag = Math.sqrt(drawnVx * drawnVx + drawnVy * drawnVy);
+        if (Math.abs(rawMag - drawnMag) > 5) {
+          console.log(`Large diff at (${x},${y}): raw=(${rawVx.toFixed(2)},${rawVy.toFixed(2)}) mag=${rawMag.toFixed(2)}, drawn at (${drawnX},${drawnY})=(${drawnVx.toFixed(2)},${drawnVy.toFixed(2)}) mag=${drawnMag.toFixed(2)}, stride=${stride}`);
+        }
+      }
+
+      // Pass raw value and the drawn vector value
+      onHover(x, y, rawVx, rawVy, drawnVx, drawnVy);
     }
   };
 
@@ -159,8 +165,14 @@ const VectorCanvas = ({
         ctx.fillStyle = `hsl(${degrees}, 80%, 60%)`;
         ctx.lineWidth = 1;
 
-        // Draw Arrow
-        const len = Math.min(stride * 1.2, mag * scale);
+        // Draw Arrow (limit to prevent excessive overlap)
+        const len = Math.min(stride * 1.5, mag * scale);
+
+        // Debug: log first few vectors
+        if (x === 72 && y === 192) {
+          console.log(`DRAWING at (${x},${y}): vx=${vx.toFixed(2)}, vy=${vy.toFixed(2)}, mag=${mag.toFixed(2)}, scale=${scale}, len=${len.toFixed(2)}, stride=${stride}`);
+        }
+
         const cx = x + stride / 2; // Center in the grid cell
         const cy = y + stride / 2;
 
@@ -215,7 +227,7 @@ export default function App() {
   const [arrowScale, setArrowScale] = useState(1.5);
 
   const [currentFrame, setCurrentFrame] = useState<Frame | null>(null);
-  const [hoverInfo, setHoverInfo] = useState<{ x: number, y: number, vx: number, vy: number } | null>(null);
+  const [hoverInfo, setHoverInfo] = useState<{ x: number, y: number, vx: number, vy: number, avgVx?: number, avgVy?: number } | null>(null);
 
   // --- Data Loading Logic ---
 
@@ -228,7 +240,7 @@ export default function App() {
       // ---------------------------------------------------------
       const id = "123";
       try {
-        const response = await fetch(`http://localhost:9093/vector-frame?id=${id}&t=${timeStep}`);
+        const response = await fetch(`http://localhost:9093/average-flow-grid?id=${id}&t=${timeStep}`);
         const blob = await response.blob();
         const frame = await unmarshalVectorFrame(blob);
         if (isMounted) setCurrentFrame(frame);
@@ -369,18 +381,38 @@ export default function App() {
                     <span className="text-gray-500">Pos:</span>
                     <span>({hoverInfo.x}, {hoverInfo.y})</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Vec X:</span>
-                    <span className={hoverInfo.vx < 0 ? 'text-red-400' : 'text-green-400'}>{hoverInfo.vx.toFixed(2)}</span>
+                  <div className="border-t border-gray-700 mt-2 pt-2">
+                    <div className="text-xs text-gray-500 mb-1">Raw Pixel:</div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Vec X:</span>
+                      <span className={hoverInfo.vx < 0 ? 'text-red-400' : 'text-green-400'}>{hoverInfo.vx.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Vec Y:</span>
+                      <span className={hoverInfo.vy < 0 ? 'text-red-400' : 'text-green-400'}>{hoverInfo.vy.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Mag:</span>
+                      <span className="text-white">{Math.sqrt(hoverInfo.vx ** 2 + hoverInfo.vy ** 2).toFixed(2)}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Vec Y:</span>
-                    <span className={hoverInfo.vy < 0 ? 'text-red-400' : 'text-green-400'}>{hoverInfo.vy.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between border-t border-gray-700 mt-2 pt-2">
-                    <span className="text-gray-500">Mag:</span>
-                    <span className="text-white">{Math.sqrt(hoverInfo.vx ** 2 + hoverInfo.vy ** 2).toFixed(2)}</span>
-                  </div>
+                  {hoverInfo.avgVx !== undefined && hoverInfo.avgVy !== undefined && (
+                    <div className="border-t border-gray-700 mt-2 pt-2">
+                      <div className="text-xs text-gray-500 mb-1">Drawn Vector (at stride):</div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Drawn X:</span>
+                        <span className={hoverInfo.avgVx < 0 ? 'text-red-400' : 'text-green-400'}>{hoverInfo.avgVx.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Drawn Y:</span>
+                        <span className={hoverInfo.avgVy < 0 ? 'text-red-400' : 'text-green-400'}>{hoverInfo.avgVy.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Drawn Mag:</span>
+                        <span className="text-white">{Math.sqrt(hoverInfo.avgVx ** 2 + hoverInfo.avgVy ** 2).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-xs text-gray-600 italic text-center mt-4">
@@ -397,7 +429,7 @@ export default function App() {
               frame={currentFrame}
               stride={stride}
               scale={arrowScale}
-              onHover={(x, y, vx, vy) => setHoverInfo({ x, y, vx, vy })}
+              onHover={(x, y, vx, vy, avgVx, avgVy) => setHoverInfo({ x, y, vx, vy, avgVx, avgVy })}
             />
             <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 text-gray-400 text-xs rounded backdrop-blur-sm pointer-events-none">
               Canvas Render

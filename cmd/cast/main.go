@@ -29,6 +29,7 @@ func main() {
 	extrapolate := flag.Int("extrapolate", 0, "Number of future points to extrapolate and draw.")
 	serverURL := flag.String("serverURL", "", "URL of the processing server (e.g., http://localhost:8080). If provided, processing is done remotely.")
 	requestID := flag.String("id", "", "Optional: A custom ID for the remote processing request. Only used with -serverURL.")
+	gridType := flag.String("gridType", "flow", "Type of grid to generate: 'flow' or 'average'.")
 	flag.Parse()
 
 	fileArgs := flag.Args()
@@ -50,7 +51,7 @@ func main() {
 	}
 
 	if *serverURL != "" {
-		processRemotely(*serverURL, *requestID, fileArgs, config)
+		processRemotely(*serverURL, *requestID, *gridType, fileArgs, config)
 	} else {
 		processLocally(fileArgs, config, *vectorScale, *extrapolate)
 	}
@@ -110,7 +111,7 @@ func processLocally(fileArgs []string, config newcast.ProcessConfig, vectorScale
 	}
 }
 
-func processRemotely(serverURL string, requestID string, fileArgs []string, config newcast.ProcessConfig) {
+func processRemotely(serverURL string, requestID string, gridType string, fileArgs []string, config newcast.ProcessConfig) {
 	fmt.Printf("--- Processing remotely on server: %s ---\n", serverURL)
 
 	if requestID == "" {
@@ -132,6 +133,7 @@ func processRemotely(serverURL string, requestID string, fileArgs []string, conf
 		"filenames": absFileArgs,
 		"id":        requestID,
 		"config":    config,
+		"gridType":  gridType,
 	}
 	
 	jsonBody, err := json.Marshal(reqBody)
@@ -156,8 +158,15 @@ func processRemotely(serverURL string, requestID string, fileArgs []string, conf
 	}
 
 	fmt.Printf("Successfully submitted processing request with ID: %s\n", requestID)
-	fmt.Println("\nTo fetch the vector frames, use the following commands:")
-	for i := 0; i < len(fileArgs)-1; i++ {
-		fmt.Printf("curl -o frame_%d.png \"%s/vector-frame?id=%s&t=%d\"\n", i, serverURL, requestID, i)
+	
+	switch gridType {
+	case "average":
+		fmt.Println("\nTo fetch the average flow grid, use the following command:")
+		fmt.Printf("curl -o average_flow_grid.png \"%s/average-flow-grid?id=%s\"\n", serverURL, requestID)
+	default: // "flow"
+		fmt.Println("\nTo fetch the vector frames, use the following commands:")
+		for i := 0; i < len(fileArgs)-1; i++ {
+			fmt.Printf("curl -o frame_%d.png \"%s/vector-frame?id=%s&t=%d\"\n", i, serverURL, requestID, i)
+		}
 	}
 }

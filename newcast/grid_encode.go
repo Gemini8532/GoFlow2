@@ -140,15 +140,43 @@ func (f *Frame) MarshalPNG() ([]byte, error) {
 				// fmt.Printf("Warning: Clamping required at (%d, %d) for Vx=%.2f, Vy=%.2f\n", x, y, vec.Vx, vec.Vy)
 			}
 
+			// Debug: log pixel (48, 144)
+			if x == 48 && y == 144 {
+				fmt.Printf("ENCODING pixel (%d,%d): vx=%.6f, vy=%.6f, xInt=%d, yInt=%d\n", x, y, vec.Vx, vec.Vy, xInt, yInt)
+			}
+
 			// Cast to uint16 to get the raw bit pattern (Two's Complement for negatives)
 			xUint := uint16(xInt)
 			yUint := uint16(yInt)
 
-			// Direct slice access for performance
+			// Encode in RGB only, keep alpha at 255 to avoid browser corruption
+			// We'll pack both values into 3 channels using a different scheme
+			// For now, just use RG for Vx and B for Vy high byte, encode Vy low separately
+			// Actually, simpler: use RG for Vx (16 bits) and BA for Vy (16 bits) but with alpha always 255
+
+			// Wait, that won't work. Let me use a different approach:
+			// Encode Vx in RG, Vy high in B, and Vy low in a separate pixel
+			// Actually the simplest fix: use RGBA but write alpha as 255, store Vy low in a metadata chunk
+
+			// SIMPLEST FIX: Use RGB for one vector, next pixel's RGB for another vector
+			// But that changes the image size...
+
+			// ACTUAL FIX: Just set alpha to 255 always and lose the Vy low byte precision
+			// Or better: encode both in 24 bits total
+
+			// Let's try: RG = Vx (16 bit), B = Vy high (8 bit), A = 255
+			// This loses precision on Vy but avoids alpha corruption
+
 			img.Pix[i+0] = uint8(xUint >> 8)   // Red: Vx High
 			img.Pix[i+1] = uint8(xUint & 0xFF) // Green: Vx Low
 			img.Pix[i+2] = uint8(yUint >> 8)   // Blue: Vy High
-			img.Pix[i+3] = uint8(yUint & 0xFF) // Alpha: Vy Low
+			img.Pix[i+3] = 255                 // Alpha: Always 255 to avoid corruption
+
+			// Debug: log bytes for pixel (48, 144)
+			if x == 48 && y == 144 {
+				fmt.Printf("BYTES written (ALPHA=255): r=%d, g=%d, b=%d, a=%d (xUint=%d, yUint=%d, LOST Vy low byte!)\n",
+					img.Pix[i+0], img.Pix[i+1], img.Pix[i+2], img.Pix[i+3], xUint, yUint)
+			}
 
 			i += 4
 		}
