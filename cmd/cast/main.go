@@ -16,28 +16,21 @@ import (
 )
 
 func main() {
-	// --- Command-Line Flags ---
+	// Command-Line Flags
 	maxFeatures := flag.Int("maxFeatures", 200, "Maximum number of features to track.")
-	smoothness := flag.Float64("smoothness", 0.5, "Smoothness threshold (max average angle change in radians).")
 	vectorScale := flag.Float64("vectorScale", 50.0, "Scaling factor for drawing velocity vectors.")
-	filterType := flag.String("filterType", "smoothness", "Type of filter to use: 'smoothness', 'density', 'max_angle', or 'curvefit'.")
-	maxAngle := flag.Float64("maxAngle", 0.8, "Maximum allowed angle change (in radians) for the max_angle filter.")
-	gridCellSize := flag.Int("gridCellSize", 64, "Grid cell size for density filter.")
-	minTracksPerCell := flag.Int("minTracksPerCell", 2, "Minimum number of tracks in a cell to be considered dense.")
-	maxTracksPerCell := flag.Int("maxTracksPerCell", 5, "Maximum number of smoothest tracks to keep from a dense cell.")
 	minTrackLength := flag.Int("minTrackLength", 6, "Minimum number of points a track must have to be considered.")
 	extrapolate := flag.Int("extrapolate", 0, "Number of future points to extrapolate and draw.")
-	serverURL := flag.String("serverURL", "", "URL of the processing server (e.g., http://localhost:8080). If provided, processing is done remotely.")
+	serverURL := flag.String("serverURL", "", "URL of the processing server (e.g., http://localhost:9093). If provided, processing is done remotely.")
 	requestID := flag.String("id", "", "Optional: A custom ID for the remote processing request. Only used with -serverURL.")
-	gridType := flag.String("gridType", "flow", "Type of grid to generate: 'flow' or 'average'.")
 	blurSigma := flag.Float64("blurSigma", 0.0, "Gaussian blur sigma for flow grid smoothing (0 = no blur, 1.0 = light, 2.0 = medium).")
 	useFittedPoints := flag.Bool("useFittedPoints", false, "Use polynomial-fitted points instead of raw tracked points (reduces noise).")
 
-	// Curve-fit filtering parameters
-	minRSquared := flag.Float64("minRSquared", 0.85, "Minimum R² for curve-fit filter (0-1, higher = stricter).")
+	// Curve-fit filtering parameters (updated to recommended defaults)
+	minRSquared := flag.Float64("minRSquared", 0.90, "Minimum R² for curve-fit filter (0-1, higher = stricter).")
 	maxRMSE := flag.Float64("maxRMSE", 3.0, "Maximum RMSE in pixels for curve-fit filter.")
-	maxDeviation := flag.Float64("maxDeviation", 8.0, "Maximum deviation from fitted curve in pixels.")
-	maxAcceleration := flag.Float64("maxAcceleration", 2.0, "Maximum acceleration in pixels/frame² for curve-fit filter.")
+	maxDeviation := flag.Float64("maxDeviation", 7.0, "Maximum deviation from fitted curve in pixels.")
+	maxAcceleration := flag.Float64("maxAcceleration", 1.5, "Maximum acceleration in pixels/frame² for curve-fit filter.")
 
 	flag.Parse()
 
@@ -49,24 +42,18 @@ func main() {
 	}
 
 	config := newcast.ProcessConfig{
-		MaxFeatures:      *maxFeatures,
-		Smoothness:       *smoothness,
-		FilterType:       *filterType,
-		MaxAngle:         *maxAngle,
-		GridCellSize:     *gridCellSize,
-		MinTracksPerCell: *minTracksPerCell,
-		MaxTracksPerCell: *maxTracksPerCell,
-		MinTrackLength:   *minTrackLength,
-		BlurSigma:        *blurSigma,
-		UseFittedPoints:  *useFittedPoints,
-		MinRSquared:      *minRSquared,
-		MaxRMSE:          *maxRMSE,
-		MaxDeviation:     *maxDeviation,
-		MaxAcceleration:  *maxAcceleration,
+		MaxFeatures:     *maxFeatures,
+		MinTrackLength:  *minTrackLength,
+		BlurSigma:       *blurSigma,
+		UseFittedPoints: *useFittedPoints,
+		MinRSquared:     *minRSquared,
+		MaxRMSE:         *maxRMSE,
+		MaxDeviation:    *maxDeviation,
+		MaxAcceleration: *maxAcceleration,
 	}
 
 	if *serverURL != "" {
-		processRemotely(*serverURL, *requestID, *gridType, fileArgs, config)
+		processRemotely(*serverURL, *requestID, fileArgs, config)
 	} else {
 		processLocally(fileArgs, config, *vectorScale, *extrapolate)
 	}
@@ -77,16 +64,11 @@ func processLocally(fileArgs []string, config newcast.ProcessConfig, vectorScale
 	fmt.Printf("Processing %d input files\n", len(fileArgs))
 	fmt.Printf("Running with parameters: maxFeatures=%d, vectorScale=%.2f, minTrackLength=%d, extrapolate=%d\n",
 		config.MaxFeatures, vectorScale, config.MinTrackLength, extrapolate)
-	fmt.Printf("Filter type: %s\n", config.FilterType)
-	switch config.FilterType {
-	case "smoothness":
-		fmt.Printf("Smoothness filter params: smoothness=%.2f\n", config.Smoothness)
-	case "density":
-		fmt.Printf("Density filter params: gridCellSize=%d, minTracksPerCell=%d, maxTracksPerCell=%d\n",
-			config.GridCellSize, config.MinTracksPerCell, config.MaxTracksPerCell)
-	case "max_angle":
-		fmt.Printf("Max Angle filter params: maxAngle=%.2f\n", config.MaxAngle)
-	}
+	fmt.Println("Using curvefit filtering:")
+	fmt.Printf("  MinRSquared: %.2f\n", config.MinRSquared)
+	fmt.Printf("  MaxRMSE: %.2f\n", config.MaxRMSE)
+	fmt.Printf("  MaxDeviation: %.2f\n", config.MaxDeviation)
+	fmt.Printf("  MaxAcceleration: %.2f\n", config.MaxAcceleration)
 
 	filteredTracks, width, height, err := newcast.ProcessFilesToTracks(fileArgs, config)
 	if err != nil {
@@ -126,7 +108,7 @@ func processLocally(fileArgs []string, config newcast.ProcessConfig, vectorScale
 	}
 }
 
-func processRemotely(serverURL string, requestID string, gridType string, fileArgs []string, config newcast.ProcessConfig) {
+func processRemotely(serverURL string, requestID string, fileArgs []string, config newcast.ProcessConfig) {
 	fmt.Printf("--- Processing remotely on server: %s ---\n", serverURL)
 
 	if requestID == "" {
@@ -148,7 +130,6 @@ func processRemotely(serverURL string, requestID string, gridType string, fileAr
 		"filenames": absFileArgs,
 		"id":        requestID,
 		"config":    config,
-		"gridType":  gridType,
 	}
 
 	jsonBody, err := json.Marshal(reqBody)
@@ -173,15 +154,6 @@ func processRemotely(serverURL string, requestID string, gridType string, fileAr
 	}
 
 	fmt.Printf("Successfully submitted processing request with ID: %s\n", requestID)
-
-	switch gridType {
-	case "average":
-		fmt.Println("\nTo fetch the average flow grid, use the following command:")
-		fmt.Printf("curl -o average_flow_grid.png \"%s/average-flow-grid?id=%s\"\n", serverURL, requestID)
-	default: // "flow"
-		fmt.Println("\nTo fetch the vector frames, use the following commands:")
-		for i := 0; i < len(fileArgs)-1; i++ {
-			fmt.Printf("curl -o frame_%d.png \"%s/vector-frame?id=%s&t=%d\"\n", i, serverURL, requestID, i)
-		}
-	}
+	fmt.Println("\nTo fetch the flow grid, use the following command:")
+	fmt.Printf("curl -o flow_grid.bin \"%s/average-flow-grid?id=%s\"\n", serverURL, requestID)
 }
