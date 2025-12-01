@@ -3,10 +3,11 @@ package newcast
 import (
 	"fmt"
 	"os"
+	"sort"
 	"testing"
 )
 
-// TestCurveFitFiltering compares curve-fit based filtering with current ad-hoc filtering
+// TestCurveFitFiltering tests the curve-fit based filtering
 func TestCurveFitFiltering(t *testing.T) {
 	// Load real rainfall data
 	matches, err := os.ReadDir("../rainfall_data")
@@ -21,6 +22,7 @@ func TestCurveFitFiltering(t *testing.T) {
 			files = append(files, "../rainfall_data/"+entry.Name())
 		}
 	}
+	sort.Strings(files)
 
 	if len(files) < 2 {
 		t.Skip("Need at least 2 files")
@@ -29,28 +31,38 @@ func TestCurveFitFiltering(t *testing.T) {
 
 	files = files[:min(10, len(files))]
 
-	// Process with minimal filtering to get raw tracks
-	configRaw := ProcessConfig{
-		MaxFeatures:      1000,
-		Smoothness:       10.0, // Very high = accept everything
-		FilterType:       "smoothness",
-		MaxAngle:         10.0,
-		GridCellSize:     64,
-		MinTracksPerCell: 1,
-		MaxTracksPerCell: 100,
-		MinTrackLength:   4,
-	}
-
-	rawTracks, _, _, err := ProcessFilesToTracks(files, configRaw)
+	// Manually generate raw tracks
+	tracker, err := NewTracker(1000) // MaxFeatures
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Printf("Raw tracks (min length 4): %d\n", len(rawTracks))
+	defer tracker.Close()
 
-	// Apply current smoothness filter
-	smoothnessTracks := FilterTracksBySmoothness(rawTracks, 0.5)
-	fmt.Printf("After smoothness filter (0.5): %d (%.1f%% of raw)\n",
-		len(smoothnessTracks), 100.0*float64(len(smoothnessTracks))/float64(len(rawTracks)))
+	for _, imgPath := range files {
+		img, err := loadImageAsGrayscale(imgPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// defer img.Close() // In a loop, defer will stack up. Better to close manually or rely on GoCV finalizers (if any). 
+		// Ideally close manually.
+		
+		if err := tracker.AddImage(img); err != nil {
+			img.Close()
+			t.Fatal(err)
+		}
+		img.Close()
+	}
+
+	allTracks := tracker.GetTracks()
+	var rawTracks []*Track
+	minTrackLength := 4
+	for _, track := range allTracks {
+		if len(track.Points) >= minTrackLength {
+			rawTracks = append(rawTracks, track)
+		}
+	}
+	
+	fmt.Printf("Raw tracks (min length %d): %d\n", minTrackLength, len(rawTracks))
 
 	// Apply curve-fit filter with default config
 	curveFitConfig := DefaultCurveFitConfig()
@@ -60,10 +72,6 @@ func TestCurveFitFiltering(t *testing.T) {
 
 	// Analyze the quality of filtered tracks
 	fmt.Println("\n=== Quality Analysis ===")
-
-	// Smoothness-filtered tracks
-	fmt.Println("Smoothness-filtered tracks:")
-	analyzeTrackQuality(smoothnessTracks)
 
 	// Curve-fit filtered tracks
 	fmt.Println("\nCurve-fit filtered tracks:")

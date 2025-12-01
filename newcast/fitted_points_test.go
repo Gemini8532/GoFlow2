@@ -34,7 +34,6 @@ func TestRawVsFittedPoints(t *testing.T) {
 	// Get tracks with curve-fit filtering
 	config := ProcessConfig{
 		MaxFeatures:     1000,
-		FilterType:      "curvefit",
 		MinTrackLength:  6,
 		MinRSquared:     0.85,
 		MaxRMSE:         3.0,

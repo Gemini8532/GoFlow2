@@ -33,12 +33,6 @@ func TestSmoothFillArtifacts(t *testing.T) {
 
 	config := ProcessConfig{
 		MaxFeatures:      1000,
-		Smoothness:       0.1,
-		FilterType:       "smoothness",
-		MaxAngle:         0.3,
-		GridCellSize:     64,
-		MinTracksPerCell: 2,
-		MaxTracksPerCell: 5,
 		MinTrackLength:   6,
 	}
 
@@ -47,8 +41,7 @@ func TestSmoothFillArtifacts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	avgTracks := CalculateAveragedTracks(tracks)
-	grid := GenerateAverageFlowGrid(avgTracks, width, height, 4)
+	grid := GenerateFlowGridFromTracks(tracks, width, height, 0.0)
 
 	// Check for banding artifacts by looking at magnitude gradients
 	// Banding shows up as sudden changes in magnitude along contours

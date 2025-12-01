@@ -11,28 +11,16 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-
-	"gocv.io/x/gocv"
 )
 
 func main() {
 	// --- Command-Line Flags ---
 	maxFeatures := flag.Int("maxFeatures", 200, "Maximum number of features to track.")
-	smoothness := flag.Float64("smoothness", 0.5, "Smoothness threshold (max average angle change in radians).")
-	vectorScale := flag.Float64("vectorScale", 50.0, "Scaling factor for drawing velocity vectors.")
-	filterType := flag.String("filterType", "smoothness", "Type of filter to use: 'smoothness', 'density', 'max_angle', or 'curvefit'.")
-	maxAngle := flag.Float64("maxAngle", 0.8, "Maximum allowed angle change (in radians) for the max_angle filter.")
-	gridCellSize := flag.Int("gridCellSize", 64, "Grid cell size for density filter.")
-	minTracksPerCell := flag.Int("minTracksPerCell", 2, "Minimum number of tracks in a cell to be considered dense.")
-	maxTracksPerCell := flag.Int("maxTracksPerCell", 5, "Maximum number of smoothest tracks to keep from a dense cell.")
 	minTrackLength := flag.Int("minTrackLength", 6, "Minimum number of points a track must have to be considered.")
-	extrapolate := flag.Int("extrapolate", 0, "Number of future points to extrapolate and draw.")
 	serverURL := flag.String("serverURL", "", "URL of the processing server (e.g., http://localhost:8080). If provided, processing is done remotely.")
 	requestID := flag.String("id", "", "Optional: A custom ID for the remote processing request. Only used with -serverURL.")
-	gridType := flag.String("gridType", "flow", "Type of grid to generate: 'flow' or 'average'.")
-	outputGrid := flag.String("outputGrid", "", "Output file for saving average flow grid (required when serverURL is not specified and gridType is average).")
+	outputGrid := flag.String("outputGrid", "", "Output file for saving average flow grid (required when serverURL is not specified).")
 	blurSigma := flag.Float64("blurSigma", 0.0, "Gaussian blur sigma for flow grid smoothing (0 = no blur, 1.0 = light, 2.0 = medium).")
-	useFittedPoints := flag.Bool("useFittedPoints", false, "Use polynomial-fitted points instead of raw tracked points (reduces noise).")
 
 	// Curve-fit filtering parameters
 	minRSquared := flag.Float64("minRSquared", 0.85, "Minimum R² for curve-fit filter (0-1, higher = stricter).")
@@ -50,51 +38,35 @@ func main() {
 	}
 
 	config := newcast.ProcessConfig{
-		MaxFeatures:      *maxFeatures,
-		Smoothness:       *smoothness,
-		FilterType:       *filterType,
-		MaxAngle:         *maxAngle,
-		GridCellSize:     *gridCellSize,
-		MinTracksPerCell: *minTracksPerCell,
-		MaxTracksPerCell: *maxTracksPerCell,
-		MinTrackLength:   *minTrackLength,
-		BlurSigma:        *blurSigma,
-		UseFittedPoints:  *useFittedPoints,
-		MinRSquared:      *minRSquared,
-		MaxRMSE:          *maxRMSE,
-		MaxDeviation:     *maxDeviation,
-		MaxAcceleration:  *maxAcceleration,
+		MaxFeatures:     *maxFeatures,
+		MinTrackLength:  *minTrackLength,
+		BlurSigma:       *blurSigma,
+		MinRSquared:     *minRSquared,
+		MaxRMSE:         *maxRMSE,
+		MaxDeviation:    *maxDeviation,
+		MaxAcceleration: *maxAcceleration,
 	}
 
-	// Validate that outputGrid is specified when gridType is "average" and serverURL is not provided
-	if *serverURL == "" && *gridType == "average" && *outputGrid == "" {
-		fmt.Println("Error: -outputGrid is required when gridType is 'average' and serverURL is not specified")
+	// Validate that outputGrid is specified when serverURL is not provided
+	if *serverURL == "" && *outputGrid == "" {
+		fmt.Println("Error: -outputGrid is required when serverURL is not specified")
 		fmt.Println("Usage: go run main.go [flags] <file1.png> <file2.png> ...")
 		os.Exit(1)
 	}
 
 	if *serverURL != "" {
-		processRemotely(*serverURL, *requestID, *gridType, fileArgs, config)
+		processRemotely(*serverURL, *requestID, fileArgs, config)
 	} else {
-		processLocally(fileArgs, config, *vectorScale, *extrapolate, *gridType, *outputGrid)
+		processLocally(fileArgs, config, *outputGrid)
 	}
 }
 
-func processLocally(fileArgs []string, config newcast.ProcessConfig, vectorScale float64, extrapolate int, gridType string, outputGrid string) {
+func processLocally(fileArgs []string, config newcast.ProcessConfig, outputGrid string) {
 	fmt.Println("--- Processing locally ---")
 	fmt.Printf("Processing %d input files\n", len(fileArgs))
-	fmt.Printf("Running with parameters: maxFeatures=%d, vectorScale=%.2f, minTrackLength=%d, extrapolate=%d\n",
-		config.MaxFeatures, vectorScale, config.MinTrackLength, extrapolate)
-	fmt.Printf("Filter type: %s\n", config.FilterType)
-	switch config.FilterType {
-	case "smoothness":
-		fmt.Printf("Smoothness filter params: smoothness=%.2f\n", config.Smoothness)
-	case "density":
-		fmt.Printf("Density filter params: gridCellSize=%d, minTracksPerCell=%d, maxTracksPerCell=%d\n",
-			config.GridCellSize, config.MinTracksPerCell, config.MaxTracksPerCell)
-	case "max_angle":
-		fmt.Printf("Max Angle filter params: maxAngle=%.2f\n", config.MaxAngle)
-	}
+	fmt.Printf("Running with parameters: maxFeatures=%d, minTrackLength=%d\n",
+		config.MaxFeatures, config.MinTrackLength)
+	fmt.Println("Filter type: curvefit (forced)")
 
 	filteredTracks, width, height, err := newcast.ProcessFilesToTracks(fileArgs, config)
 	if err != nil {
@@ -103,62 +75,21 @@ func processLocally(fileArgs []string, config newcast.ProcessConfig, vectorScale
 	}
 	fmt.Printf("Found %d filtered tracks.\n", len(filteredTracks))
 
-	// Handle different grid types
-	if gridType == "average" {
-		fmt.Println("Generating average flow grid...")
+	fmt.Println("Generating average flow grid from fitted tracks...")
 
-		// Optionally use fitted points instead of raw points for smoother results
-		tracksToUse := filteredTracks
-		if config.UseFittedPoints {
-			fmt.Println("Using polynomial-fitted points instead of raw tracked points")
-			tracksToUse = newcast.ReplacWithFittedPoints(filteredTracks)
-			fmt.Printf("Fitted points: %d tracks (from %d raw tracks)\n", len(tracksToUse), len(filteredTracks))
-		}
+	// Generate average flow grid from tracks (filteredTracks are already fitted)
+	averageFlowGrid := newcast.GenerateFlowGridFromTracks(filteredTracks, width, height, config.BlurSigma)
 
-		// Generate average flow grid from tracks
-		averageFlowGrid := newcast.GenerateFlowGridFromTracks(tracksToUse, width, height, config.BlurSigma)
-
-		// Save the average flow grid to output file using the helper function
-		if err := newcast.SaveAverageFlowGridToGzippedCBOR(averageFlowGrid, outputGrid); err != nil {
-			fmt.Printf("Error saving average flow grid: %v\n", err)
-			os.Exit(1)
-		}
-
-		fmt.Printf("Average flow grid saved to %s\n", outputGrid)
-	} else {
-		// --- Generate Visualizations (for flow grid type) ---
-		trackImg := newcast.VisualizeTracks(filteredTracks, width, height)
-		defer trackImg.Close()
-		trackImgPath := "rainfall_tracks.png"
-		if ok := gocv.IMWrite(trackImgPath, trackImg); !ok {
-			fmt.Printf("Error writing track visualization to %s\n", trackImgPath)
-			os.Exit(1)
-		}
-		fmt.Printf("Track visualization saved to %s\n", trackImgPath)
-
-		vectorImg := newcast.VisualizeVectors(filteredTracks, width, height, vectorScale)
-		defer vectorImg.Close()
-		vectorImgPath := "rainfall_vectors.png"
-		if ok := gocv.IMWrite(vectorImgPath, vectorImg); !ok {
-			fmt.Printf("Error writing vector visualization to %s\n", vectorImgPath)
-			os.Exit(1)
-		}
-		fmt.Printf("Vector visualization saved to %s\n", vectorImgPath)
-
-		if extrapolate > 0 {
-			extrapolatedImg := newcast.VisualizeExtrapolatedTracks(filteredTracks, width, height, extrapolate)
-			defer extrapolatedImg.Close()
-			extrapolatedImgPath := "rainfall_tracks_extrapolated.png"
-			if ok := gocv.IMWrite(extrapolatedImgPath, extrapolatedImg); !ok {
-				fmt.Printf("Error writing extrapolated track visualization to %s\n", extrapolatedImgPath)
-				os.Exit(1)
-			}
-			fmt.Printf("Extrapolated track visualization saved to %s\n", extrapolatedImgPath)
-		}
+	// Save the average flow grid to output file using the helper function
+	if err := newcast.SaveAverageFlowGridToGzippedCBOR(averageFlowGrid, outputGrid); err != nil {
+		fmt.Printf("Error saving average flow grid: %v\n", err)
+		os.Exit(1)
 	}
+
+	fmt.Printf("Average flow grid saved to %s\n", outputGrid)
 }
 
-func processRemotely(serverURL string, requestID string, gridType string, fileArgs []string, config newcast.ProcessConfig) {
+func processRemotely(serverURL string, requestID string, fileArgs []string, config newcast.ProcessConfig) {
 	fmt.Printf("--- Processing remotely on server: %s ---\n", serverURL)
 
 	if requestID == "" {
@@ -180,7 +111,7 @@ func processRemotely(serverURL string, requestID string, gridType string, fileAr
 		"filenames": absFileArgs,
 		"id":        requestID,
 		"config":    config,
-		"gridType":  gridType,
+		// "gridType":  "average", // Server should assume average or handle removal
 	}
 
 	jsonBody, err := json.Marshal(reqBody)
@@ -205,15 +136,6 @@ func processRemotely(serverURL string, requestID string, gridType string, fileAr
 	}
 
 	fmt.Printf("Successfully submitted processing request with ID: %s\n", requestID)
-
-	switch gridType {
-	case "average":
-		fmt.Println("\nTo fetch the average flow grid, use the following command:")
-		fmt.Printf("curl -o average_flow_grid.png \"%s/average-flow-grid?id=%s\"\n", serverURL, requestID)
-	default: // "flow"
-		fmt.Println("\nTo fetch the vector frames, use the following commands:")
-		for i := 0; i < len(fileArgs)-1; i++ {
-			fmt.Printf("curl -o frame_%d.png \"%s/vector-frame?id=%s&t=%d\"\n", i, serverURL, requestID, i)
-		}
-	}
+	fmt.Println("\nTo fetch the average flow grid, use the following command:")
+	fmt.Printf("curl -o average_flow_grid.png \"%s/average-flow-grid?id=%s\"\n", serverURL, requestID)
 }

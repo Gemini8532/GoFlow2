@@ -20,7 +20,6 @@ type TrackVisuals struct {
 
 // RequestData holds all the data associated with a single processing request.
 type RequestData struct {
-	FlowGrid        *newcast.FlowGrid
 	AverageFlowGrid *newcast.AverageFlowGrid
 	Visuals         TrackVisuals
 }
@@ -57,7 +56,7 @@ func (s *Server) processHandler(w http.ResponseWriter, r *http.Request) {
 		Filenames []string               `json:"filenames"`
 		ID        string                 `json:"id"`
 		Config    *newcast.ProcessConfig `json:"config"`
-		GridType  string                 `json:"gridType"`
+		// GridType field removed, assumed "average"
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -70,18 +69,12 @@ func (s *Server) processHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Received process request for ID: %s with %d files and gridType: %s", req.ID, len(req.Filenames), req.GridType)
+	log.Printf("Received process request for ID: %s with %d files", req.ID, len(req.Filenames))
 
 	// Use provided config or default
 	config := newcast.ProcessConfig{
-		MaxFeatures:      200,
-		Smoothness:       0.5,
-		FilterType:       "smoothness",
-		MaxAngle:         0.8,
-		GridCellSize:     64,
-		MinTracksPerCell: 2,
-		MaxTracksPerCell: 5,
-		MinTrackLength:   6,
+		MaxFeatures:    200,
+		MinTrackLength: 6,
 	}
 	if req.Config != nil {
 		config = *req.Config
@@ -107,30 +100,10 @@ func (s *Server) processHandler(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	switch req.GridType {
-	case "average":
-		log.Println("Generating AverageFlowGrid from tracks directly")
-
-		// Optionally use fitted points instead of raw points for smoother results
-		tracksToUse := filteredTracks
-		if config.UseFittedPoints {
-			log.Println("Using polynomial-fitted points instead of raw tracked points")
-			tracksToUse = newcast.ReplacWithFittedPoints(filteredTracks)
-			log.Printf("Fitted points: %d tracks (from %d raw tracks)", len(tracksToUse), len(filteredTracks))
-		}
-
-		// blurSigma from config: 0 = no blur, 1.0 = light blur, 2.0 = medium blur
-		averageFlowGrid := newcast.GenerateFlowGridFromTracks(tracksToUse, width, height, config.BlurSigma)
-		requestData.AverageFlowGrid = averageFlowGrid
-	default: // "flow" or empty
-		log.Println("Generating FlowGrid")
-		numTimeSteps := len(req.Filenames) - 1 // Flow is generated between frames
-		flowProcessor := newcast.NewFlowProcessor(width, height, numTimeSteps)
-		flowProcessor.ProcessTracks(filteredTracks)
-		flowProcessor.CalculateAverages()
-		flowProcessor.FillGaps() // Fill all empty space
-		requestData.FlowGrid = flowProcessor.Grid
-	}
+	log.Println("Generating AverageFlowGrid from fitted tracks")
+	// Generate average flow grid from tracks (tracks are already fitted)
+	averageFlowGrid := newcast.GenerateFlowGridFromTracks(filteredTracks, width, height, config.BlurSigma)
+	requestData.AverageFlowGrid = averageFlowGrid
 
 	s.mu.Lock()
 	s.requests[req.ID] = requestData
@@ -139,98 +112,6 @@ func (s *Server) processHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Data for ID %s generated and stored successfully.", req.ID)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Data generated and stored"})
-}
-
-func (s *Server) vectorFrameHandler(w http.ResponseWriter, r *http.Request) {
-	// 1. CORS Headers
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	if r.Method != "GET" {
-		http.Error(w, "Only GET method is supported", http.StatusMethodNotAllowed)
-		return
-	}
-
-	id := r.URL.Query().Get("id")
-	tStr := r.URL.Query().Get("t")
-
-	if id == "" || tStr == "" {
-		http.Error(w, "ID and time index 't' are required query parameters", http.StatusBadRequest)
-		return
-	}
-
-	t, err := strconv.Atoi(tStr)
-	if err != nil {
-		http.Error(w, "Invalid time index 't'", http.StatusBadRequest)
-		return
-	}
-
-	s.mu.RLock()
-	requestData, ok := s.requests[id]
-	s.mu.RUnlock()
-
-	if !ok {
-		http.Error(w, fmt.Sprintf("No data found for ID: %s", id), http.StatusNotFound)
-		return
-	}
-	if requestData.FlowGrid == nil {
-		http.Error(w, fmt.Sprintf("FlowGrid not generated for ID: %s", id), http.StatusNotFound)
-		return
-	}
-	flowGrid := requestData.FlowGrid
-
-	if t < 0 || t >= flowGrid.Time {
-		http.Error(w, fmt.Sprintf("Time index %d out of bounds (0 to %d)", t, flowGrid.Time-1), http.StatusBadRequest)
-		return
-	}
-
-	// Create a newcast.Frame from the FlowGrid time slice
-	frame := newcast.NewFrame(flowGrid.Width, flowGrid.Height)
-	startIndex := (t * flowGrid.Height) * flowGrid.Width
-	endIndex := startIndex + (flowGrid.Height * flowGrid.Width)
-	if endIndex > len(flowGrid.Data) {
-		endIndex = len(flowGrid.Data)
-	}
-
-	// Copy the relevant time slice data into the frame
-	copy(frame.Data, flowGrid.Data[startIndex:endIndex])
-
-	// Handle resizing
-	heightStr := r.URL.Query().Get("height")
-	if heightStr != "" {
-		height, err := strconv.Atoi(heightStr)
-		if err != nil {
-			http.Error(w, "Invalid height parameter", http.StatusBadRequest)
-			return
-		}
-		if height > 0 {
-			aspectRatio := float64(flowGrid.Width) / float64(flowGrid.Height)
-			width := int(float64(height) * aspectRatio)
-			frame = frame.Resize(width, height)
-		}
-	} else {
-		// Default resizing if no height is specified
-		aspectRatio := float64(flowGrid.Width) / float64(flowGrid.Height)
-		height := 256
-		width := int(float64(height) * aspectRatio)
-		frame = frame.Resize(width, height)
-	}
-
-	pngBytes, err := frame.MarshalPNG()
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to marshal PNG: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "image/png")
-	w.Write(pngBytes)
-	log.Printf("Served vector frame for ID: %s, time: %d", id, t)
 }
 
 func (s *Server) trackVisHandler(w http.ResponseWriter, r *http.Request) {
@@ -314,12 +195,6 @@ func (s *Server) averageFlowGridHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	avgFlowGrid := requestData.AverageFlowGrid
 
-	frame := &newcast.Frame{
-		Width:  avgFlowGrid.Width,
-		Height: avgFlowGrid.Height,
-		Data:   avgFlowGrid.Data,
-	}
-
 	// Handle resizing
 	heightStr := r.URL.Query().Get("height")
 	if heightStr != "" {
@@ -331,7 +206,7 @@ func (s *Server) averageFlowGridHandler(w http.ResponseWriter, r *http.Request) 
 		if height > 0 {
 			aspectRatio := float64(avgFlowGrid.Width) / float64(avgFlowGrid.Height)
 			width := int(float64(height) * aspectRatio)
-			frame = frame.Resize(width, height)
+			avgFlowGrid = avgFlowGrid.Resize(width, height)
 		}
 	}
 	// TEMPORARILY DISABLED: Testing if resize is causing corruption
@@ -340,18 +215,12 @@ func (s *Server) averageFlowGridHandler(w http.ResponseWriter, r *http.Request) 
 	// 	aspectRatio := float64(avgFlowGrid.Width) / float64(avgFlowGrid.Height)
 	// 	height := 256
 	// 	width := int(float64(height) * aspectRatio)
-	// 	frame = frame.Resize(width, height)
+	// 	avgFlowGrid = avgFlowGrid.Resize(width, height)
 	// }
 
 	// Send gzipped CBOR format instead of the old binary format to improve efficiency and data integrity
-	// Create AverageFlowGrid from frame data for CBOR encoding
-	avgFlowGridForEncoding := &newcast.AverageFlowGrid{
-		Width:  frame.Width,
-		Height: frame.Height,
-		Data:   frame.Data, // Frame.Data and AverageFlowGrid.Data both contain Vector slices
-	}
-
-	cborData, err := avgFlowGridForEncoding.MarshalGzippedCBOR()
+	// Use avgFlowGrid directly for CBOR encoding
+	cborData, err := avgFlowGrid.MarshalGzippedCBOR()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to marshal to gzipped CBOR: %v", err), http.StatusInternalServerError)
 		return
@@ -359,8 +228,8 @@ func (s *Server) averageFlowGridHandler(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Encoding", "gzip")
-	w.Header().Set("X-Grid-Width", strconv.Itoa(frame.Width))
-	w.Header().Set("X-Grid-Height", strconv.Itoa(frame.Height))
+	w.Header().Set("X-Grid-Width", strconv.Itoa(avgFlowGrid.Width))
+	w.Header().Set("X-Grid-Height", strconv.Itoa(avgFlowGrid.Height))
 	w.Write(cborData)
 	log.Printf("Served average flow grid for ID: %s", id)
 }
@@ -369,7 +238,7 @@ func main() {
 	server := NewServer()
 
 	http.HandleFunc("/process", server.processHandler)
-	http.HandleFunc("/vector-frame", server.vectorFrameHandler)
+	// /vector-frame removed
 	http.HandleFunc("/tracks-visualization", server.trackVisHandler)
 	http.HandleFunc("/average-flow-grid", server.averageFlowGridHandler)
 

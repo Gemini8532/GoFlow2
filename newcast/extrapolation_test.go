@@ -30,7 +30,7 @@ func TestExtrapolationCalculation(t *testing.T) {
 	track.PolyX = polyX
 	track.PolyY = polyY
 
-	// Simulate the extrapolation calculation from VisualizeExtrapolatedTracks
+	// Simulate the extrapolation calculation
 	lastT := float64(len(points) - 1) // Should be 4.0
 	numFuturePoints := 4
 

@@ -58,11 +58,6 @@ func TestCurveFitParameterSweep(t *testing.T) {
 	configRaw := ProcessConfig{
 		MaxFeatures:      2000,
 		MinTrackLength:   4,
-		FilterType:       "smoothness",
-		Smoothness:       10.0, // Very permissive
-		GridCellSize:     64,
-		MinTracksPerCell: 1,
-		MaxTracksPerCell: 100,
 	}
 
 	rawTracks, width, height, err := ProcessFilesToTracks(files, configRaw)

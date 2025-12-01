@@ -34,12 +34,6 @@ func TestGaussianBlurEffect(t *testing.T) {
 
 	config := ProcessConfig{
 		MaxFeatures:      1000,
-		Smoothness:       0.1,
-		FilterType:       "smoothness",
-		MaxAngle:         0.3,
-		GridCellSize:     64,
-		MinTracksPerCell: 2,
-		MaxTracksPerCell: 5,
 		MinTrackLength:   6,
 	}
 

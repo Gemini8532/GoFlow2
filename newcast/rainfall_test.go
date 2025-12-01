@@ -2,7 +2,6 @@ package newcast
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"testing"
 )
@@ -24,12 +23,6 @@ func TestRainfallDataAveraging(t *testing.T) {
 
 	config := ProcessConfig{
 		MaxFeatures:      1000,
-		Smoothness:       0.1,
-		FilterType:       "smoothness",
-		MaxAngle:         0.3,
-		GridCellSize:     64,
-		MinTracksPerCell: 2,
-		MaxTracksPerCell: 5,
 		MinTrackLength:   6,
 	}
 
@@ -47,16 +40,8 @@ func TestRainfallDataAveraging(t *testing.T) {
 		return
 	}
 
-	// Calculate averaged tracks
-	averagedTracks := CalculateAveragedTracks(filteredTracks)
-	fmt.Printf("Calculated %d averaged tracks\n", len(averagedTracks))
-
-	if len(averagedTracks) == 0 {
-		t.Fatal("No averaged tracks generated")
-	}
-
-	// Generate average flow grid at 256x256 resolution
-	grid := GenerateAverageFlowGrid(averagedTracks, 256, 256, 5)
+	// Generate average flow grid at 256x256 resolution (GenerateFlowGridFromTracks handles scaling internally)
+	grid := GenerateFlowGridFromTracks(filteredTracks, width, height, 0.0)
 
 	// Check that the grid has reasonable values
 	nonZeroCount := 0
@@ -133,14 +118,5 @@ func TestRainfallDataAveraging(t *testing.T) {
 
 	fmt.Printf("Discontinuities found: %d (max jump: %.2f)\n", discontinuityCount, maxDiscontinuity)
 
-	// Save a visualization for inspection
-	frame := NewFrame(256, 256)
-	for i, vec := range grid.Data {
-		frame.Data[i] = Vector{Vx: vec.Vx, Vy: vec.Vy}
-	}
-	pngData, err := frame.MarshalPNG()
-	if err == nil {
-		os.WriteFile("test_rainfall_grid.png", pngData, 0644)
-		fmt.Println("Saved visualization to test_rainfall_grid.png")
-	}
+
 }

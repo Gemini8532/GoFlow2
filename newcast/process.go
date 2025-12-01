@@ -9,18 +9,11 @@ import (
 
 // ProcessConfig holds all the parameters for processing images into tracks.
 type ProcessConfig struct {
-	MaxFeatures      int
-	Smoothness       float64
-	FilterType       string // "smoothness", "density", "max_angle", or "curvefit"
-	MaxAngle         float64
-	GridCellSize     int
-	MinTracksPerCell int
-	MaxTracksPerCell int
-	MinTrackLength   int
-	BlurSigma        float64 // Gaussian blur sigma for flow grid smoothing (0 = no blur)
-	UseFittedPoints  bool    // Use polynomial-fitted points instead of raw tracked points
+	MaxFeatures    int
+	MinTrackLength int
+	BlurSigma      float64 // Gaussian blur sigma for flow grid smoothing (0 = no blur)
 
-	// Curve-fit filtering parameters (used when FilterType = "curvefit")
+	// Curve-fit filtering parameters
 	MinRSquared     float64 // Minimum R² for polynomial fit (e.g., 0.85)
 	MaxRMSE         float64 // Maximum RMSE in pixels (e.g., 3.0)
 	MaxDeviation    float64 // Maximum deviation from curve in pixels (e.g., 8.0)
@@ -66,32 +59,26 @@ func ProcessFilesToTracks(filePaths []string, config ProcessConfig) ([]*Track, i
 		}
 	}
 
-	var filteredTracks []*Track
-	switch config.FilterType {
-	case "density":
-		smoothTracks := FilterTracksBySmoothness(longTracks, config.Smoothness)
-		filteredTracks = FilterTracksByDensityAndSmoothness(smoothTracks, config.GridCellSize, config.MinTracksPerCell, config.MaxTracksPerCell)
-	case "max_angle":
-		filteredTracks = FilterTracksByMaxAngleChange(longTracks, config.MaxAngle)
-	case "curvefit":
-		// Use curve-fit filtering with config parameters
-		curveFitConfig := CurveFitConfig{
-			MinRSquared:     config.MinRSquared,
-			MaxRMSE:         config.MaxRMSE,
-			MaxDeviation:    config.MaxDeviation,
-			MaxAcceleration: config.MaxAcceleration,
-		}
-		// Use defaults if not specified
-		if curveFitConfig.MinRSquared == 0 {
-			defaults := DefaultCurveFitConfig()
-			curveFitConfig = defaults
-		}
-		filteredTracks = FilterTracksByCurveFit(longTracks, curveFitConfig)
-	default: // "smoothness"
-		filteredTracks = FilterTracksBySmoothness(longTracks, config.Smoothness)
+	// Use curve-fit filtering with config parameters
+	curveFitConfig := CurveFitConfig{
+		MinRSquared:     config.MinRSquared,
+		MaxRMSE:         config.MaxRMSE,
+		MaxDeviation:    config.MaxDeviation,
+		MaxAcceleration: config.MaxAcceleration,
 	}
+	// Use defaults if not specified
+	if curveFitConfig.MinRSquared == 0 {
+		defaults := DefaultCurveFitConfig()
+		curveFitConfig = defaults
+	}
+	
+	// Filter tracks using curve fitting
+	filteredTracks := FilterTracksByCurveFit(longTracks, curveFitConfig)
 
-	return filteredTracks, width, height, nil
+	// Always replace with fitted points
+	finalTracks := ReplacWithFittedPoints(filteredTracks)
+
+	return finalTracks, width, height, nil
 }
 
 // loadImageAsGrayscale loads an image from the given path and converts it to a grayscale gocv.Mat.
