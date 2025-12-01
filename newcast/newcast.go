@@ -6,22 +6,6 @@ import (
 	"gocv.io/x/gocv"
 )
 
-// Point represents a point in space.
-type Point struct {
-	X, Y float64
-}
-
-// Track represents the path of a single feature over time.
-type Track struct {
-	ID                 int
-	Points             []Point
-	LatestVelocity     Point
-	LatestAcceleration Point
-	Lost               bool
-	PolyX              Polynomial // Polynomial for X coordinate
-	PolyY              Polynomial // Polynomial for Y coordinate
-}
-
 // Tracker manages the tracking of features across multiple images.
 type Tracker struct {
 	maxFeatures int

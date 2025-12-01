@@ -7,19 +7,6 @@ import (
 	"gocv.io/x/gocv"
 )
 
-// ProcessConfig holds all the parameters for processing images into tracks.
-type ProcessConfig struct {
-	MaxFeatures    int
-	MinTrackLength int
-	BlurSigma      float64 // Gaussian blur sigma for flow grid smoothing (0 = no blur)
-
-	// Curve-fit filtering parameters
-	MinRSquared     float64 // Minimum R² for polynomial fit (e.g., 0.85)
-	MaxRMSE         float64 // Maximum RMSE in pixels (e.g., 3.0)
-	MaxDeviation    float64 // Maximum deviation from curve in pixels (e.g., 8.0)
-	MaxAcceleration float64 // Maximum acceleration in pixels/frame² (e.g., 2.0)
-}
-
 // ProcessFilesToTracks takes a list of file paths and processing configuration,
 // and returns the filtered tracks, along with the width and height of the images.
 func ProcessFilesToTracks(filePaths []string, config ProcessConfig) ([]*Track, int, int, error) {

@@ -4,11 +4,6 @@ import (
 	"errors"
 )
 
-// Polynomial represents the coefficients of a degree 2 polynomial: a*t^2 + b*t + c
-type Polynomial struct {
-	A, B, C float64
-}
-
 // FitQuadratic fits a degree 2 polynomial to the X and Y coordinates of the track points.
 // It returns two Polynomials, one for the X dimension and one for the Y dimension.
 // This is a direct implementation of a least-squares fit for a quadratic curve.

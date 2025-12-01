@@ -4,15 +4,6 @@ import (
 	"math"
 )
 
-// TrackFitQuality contains metrics for evaluating how well a polynomial fits a track
-type TrackFitQuality struct {
-	RSquared     float64 // Coefficient of determination (1.0 = perfect fit)
-	RMSE         float64 // Root mean square error
-	MaxDeviation float64 // Maximum distance from fitted curve
-	AvgAccel     float64 // Average acceleration magnitude
-	MaxAccel     float64 // Maximum acceleration magnitude
-}
-
 // EvaluateTrackFit calculates quality metrics for a polynomial fit to a track
 func EvaluateTrackFit(track *Track) TrackFitQuality {
 	if len(track.Points) < 3 {
@@ -87,15 +78,6 @@ func EvaluateTrackFit(track *Track) TrackFitQuality {
 		AvgAccel:     avgAccel,
 		MaxAccel:     maxAccel,
 	}
-}
-
-// FilterTracksByCurveFit filters tracks based on polynomial fit quality
-// This is more principled than ad-hoc angle/smoothness checks
-type CurveFitConfig struct {
-	MinRSquared     float64 // Minimum R² value (e.g., 0.8)
-	MaxRMSE         float64 // Maximum RMSE in pixels (e.g., 5.0)
-	MaxDeviation    float64 // Maximum deviation from curve in pixels (e.g., 10.0)
-	MaxAcceleration float64 // Maximum acceleration in pixels/frame² (e.g., 2.0)
 }
 
 // DefaultCurveFitConfig returns reasonable default values
