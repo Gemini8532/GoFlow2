@@ -30,6 +30,7 @@ func main() {
 	serverURL := flag.String("serverURL", "", "URL of the processing server (e.g., http://localhost:8080). If provided, processing is done remotely.")
 	requestID := flag.String("id", "", "Optional: A custom ID for the remote processing request. Only used with -serverURL.")
 	gridType := flag.String("gridType", "flow", "Type of grid to generate: 'flow' or 'average'.")
+	outputGrid := flag.String("outputGrid", "", "Output file for saving average flow grid (required when serverURL is not specified and gridType is average).")
 	blurSigma := flag.Float64("blurSigma", 0.0, "Gaussian blur sigma for flow grid smoothing (0 = no blur, 1.0 = light, 2.0 = medium).")
 	useFittedPoints := flag.Bool("useFittedPoints", false, "Use polynomial-fitted points instead of raw tracked points (reduces noise).")
 
@@ -65,14 +66,21 @@ func main() {
 		MaxAcceleration:  *maxAcceleration,
 	}
 
+	// Validate that outputGrid is specified when gridType is "average" and serverURL is not provided
+	if *serverURL == "" && *gridType == "average" && *outputGrid == "" {
+		fmt.Println("Error: -outputGrid is required when gridType is 'average' and serverURL is not specified")
+		fmt.Println("Usage: go run main.go [flags] <file1.png> <file2.png> ...")
+		os.Exit(1)
+	}
+
 	if *serverURL != "" {
 		processRemotely(*serverURL, *requestID, *gridType, fileArgs, config)
 	} else {
-		processLocally(fileArgs, config, *vectorScale, *extrapolate)
+		processLocally(fileArgs, config, *vectorScale, *extrapolate, *gridType, *outputGrid)
 	}
 }
 
-func processLocally(fileArgs []string, config newcast.ProcessConfig, vectorScale float64, extrapolate int) {
+func processLocally(fileArgs []string, config newcast.ProcessConfig, vectorScale float64, extrapolate int, gridType string, outputGrid string) {
 	fmt.Println("--- Processing locally ---")
 	fmt.Printf("Processing %d input files\n", len(fileArgs))
 	fmt.Printf("Running with parameters: maxFeatures=%d, vectorScale=%.2f, minTrackLength=%d, extrapolate=%d\n",
@@ -95,34 +103,58 @@ func processLocally(fileArgs []string, config newcast.ProcessConfig, vectorScale
 	}
 	fmt.Printf("Found %d filtered tracks.\n", len(filteredTracks))
 
-	// --- Generate Visualizations ---
-	trackImg := newcast.VisualizeTracks(filteredTracks, width, height)
-	defer trackImg.Close()
-	trackImgPath := "rainfall_tracks.png"
-	if ok := gocv.IMWrite(trackImgPath, trackImg); !ok {
-		fmt.Printf("Error writing track visualization to %s\n", trackImgPath)
-		os.Exit(1)
-	}
-	fmt.Printf("Track visualization saved to %s\n", trackImgPath)
+	// Handle different grid types
+	if gridType == "average" {
+		fmt.Println("Generating average flow grid...")
 
-	vectorImg := newcast.VisualizeVectors(filteredTracks, width, height, vectorScale)
-	defer vectorImg.Close()
-	vectorImgPath := "rainfall_vectors.png"
-	if ok := gocv.IMWrite(vectorImgPath, vectorImg); !ok {
-		fmt.Printf("Error writing vector visualization to %s\n", vectorImgPath)
-		os.Exit(1)
-	}
-	fmt.Printf("Vector visualization saved to %s\n", vectorImgPath)
+		// Optionally use fitted points instead of raw points for smoother results
+		tracksToUse := filteredTracks
+		if config.UseFittedPoints {
+			fmt.Println("Using polynomial-fitted points instead of raw tracked points")
+			tracksToUse = newcast.ReplacWithFittedPoints(filteredTracks)
+			fmt.Printf("Fitted points: %d tracks (from %d raw tracks)\n", len(tracksToUse), len(filteredTracks))
+		}
 
-	if extrapolate > 0 {
-		extrapolatedImg := newcast.VisualizeExtrapolatedTracks(filteredTracks, width, height, extrapolate)
-		defer extrapolatedImg.Close()
-		extrapolatedImgPath := "rainfall_tracks_extrapolated.png"
-		if ok := gocv.IMWrite(extrapolatedImgPath, extrapolatedImg); !ok {
-			fmt.Printf("Error writing extrapolated track visualization to %s\n", extrapolatedImgPath)
+		// Generate average flow grid from tracks
+		averageFlowGrid := newcast.GenerateFlowGridFromTracks(tracksToUse, width, height, config.BlurSigma)
+
+		// Save the average flow grid to output file using the helper function
+		if err := newcast.SaveAverageFlowGridToGzippedCBOR(averageFlowGrid, outputGrid); err != nil {
+			fmt.Printf("Error saving average flow grid: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Extrapolated track visualization saved to %s\n", extrapolatedImgPath)
+
+		fmt.Printf("Average flow grid saved to %s\n", outputGrid)
+	} else {
+		// --- Generate Visualizations (for flow grid type) ---
+		trackImg := newcast.VisualizeTracks(filteredTracks, width, height)
+		defer trackImg.Close()
+		trackImgPath := "rainfall_tracks.png"
+		if ok := gocv.IMWrite(trackImgPath, trackImg); !ok {
+			fmt.Printf("Error writing track visualization to %s\n", trackImgPath)
+			os.Exit(1)
+		}
+		fmt.Printf("Track visualization saved to %s\n", trackImgPath)
+
+		vectorImg := newcast.VisualizeVectors(filteredTracks, width, height, vectorScale)
+		defer vectorImg.Close()
+		vectorImgPath := "rainfall_vectors.png"
+		if ok := gocv.IMWrite(vectorImgPath, vectorImg); !ok {
+			fmt.Printf("Error writing vector visualization to %s\n", vectorImgPath)
+			os.Exit(1)
+		}
+		fmt.Printf("Vector visualization saved to %s\n", vectorImgPath)
+
+		if extrapolate > 0 {
+			extrapolatedImg := newcast.VisualizeExtrapolatedTracks(filteredTracks, width, height, extrapolate)
+			defer extrapolatedImg.Close()
+			extrapolatedImgPath := "rainfall_tracks_extrapolated.png"
+			if ok := gocv.IMWrite(extrapolatedImgPath, extrapolatedImg); !ok {
+				fmt.Printf("Error writing extrapolated track visualization to %s\n", extrapolatedImgPath)
+				os.Exit(1)
+			}
+			fmt.Printf("Extrapolated track visualization saved to %s\n", extrapolatedImgPath)
+		}
 	}
 }
 

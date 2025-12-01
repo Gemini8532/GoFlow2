@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -345,24 +343,25 @@ func (s *Server) averageFlowGridHandler(w http.ResponseWriter, r *http.Request) 
 	// 	frame = frame.Resize(width, height)
 	// }
 
-	// Send as binary format instead of PNG to avoid encoding artifacts
-	// Format: 4 bytes width (int32), 4 bytes height (int32), then width*height*2 float32 values (vx, vy pairs)
-	buf := new(bytes.Buffer)
+	// Send gzipped CBOR format instead of the old binary format to improve efficiency and data integrity
+	// Create AverageFlowGrid from frame data for CBOR encoding
+	avgFlowGridForEncoding := &newcast.AverageFlowGrid{
+		Width:  frame.Width,
+		Height: frame.Height,
+		Data:   frame.Data, // Frame.Data and AverageFlowGrid.Data both contain Vector slices
+	}
 
-	// Write dimensions
-	binary.Write(buf, binary.LittleEndian, int32(frame.Width))
-	binary.Write(buf, binary.LittleEndian, int32(frame.Height))
-
-	// Write vector data as float32
-	for _, vec := range frame.Data {
-		binary.Write(buf, binary.LittleEndian, float32(vec.Vx))
-		binary.Write(buf, binary.LittleEndian, float32(vec.Vy))
+	cborData, err := avgFlowGridForEncoding.MarshalGzippedCBOR()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to marshal to gzipped CBOR: %v", err), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Encoding", "gzip")
 	w.Header().Set("X-Grid-Width", strconv.Itoa(frame.Width))
 	w.Header().Set("X-Grid-Height", strconv.Itoa(frame.Height))
-	w.Write(buf.Bytes())
+	w.Write(cborData)
 	log.Printf("Served average flow grid for ID: %s", id)
 }
 

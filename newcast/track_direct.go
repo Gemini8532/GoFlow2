@@ -3,6 +3,7 @@ package newcast
 import (
 	"fmt"
 	"image"
+	"os"
 
 	"gocv.io/x/gocv"
 )
@@ -149,4 +150,20 @@ func GenerateFlowGridFromTracks(tracks []*Track, origWidth, origHeight int, blur
 	}
 
 	return grid
+}
+
+// SaveAverageFlowGridToGzippedCBOR saves the AverageFlowGrid to a file in the same format as the /average-flow-grid endpoint
+// This function creates a gzipped CBOR representation of the AverageFlowGrid data
+func SaveAverageFlowGridToGzippedCBOR(averageFlowGrid *AverageFlowGrid, outputFile string) error {
+	cborData, err := averageFlowGrid.MarshalGzippedCBOR()
+	if err != nil {
+		return fmt.Errorf("failed to marshal AverageFlowGrid to gzipped CBOR: %w", err)
+	}
+
+	// Write the CBOR data to the output file
+	if err := os.WriteFile(outputFile, cborData, 0644); err != nil {
+		return fmt.Errorf("failed to write AverageFlowGrid to file: %w", err)
+	}
+
+	return nil
 }

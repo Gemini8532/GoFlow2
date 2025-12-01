@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Play, Pause, ChevronLeft, ChevronRight, Settings, Info, MousePointer2 } from 'lucide-react';
+import * as cbor from 'cbor-x';
+import * as pako from 'pako';
 
 // --- Constants & Types ---
 
@@ -12,41 +14,56 @@ interface Frame {
 }
 
 // --- decoder.ts logic (Embedded) ---
+export async function unmarshalVectorFrame(arrayBuffer: ArrayBuffer): Promise<Frame> {
+  // Parse CBOR data directly from the buffer
+  const decompressed = pako.ungzip(arrayBuffer);
+  const payload = cbor.decode(new Uint8Array(decompressed));
+  console.log(`payload received ${payload.length} bytes`);
 
-/**
- * Decodes your custom 16-bit packed PNG format.
- * R=X_high, G=X_low, B=Y_high, A=Y_low
- * Note: In a real browser environment fetching from a server, 
- * createImageBitmap with { premultiplyAlpha: 'none' } is essential.
- */
-// Decode binary vector frame format
-// Format: 4 bytes width (int32), 4 bytes height (int32), then width*height*2 float32 values
-async function unmarshalVectorFrame(blob: Blob): Promise<Frame> {
-  const arrayBuffer = await blob.arrayBuffer();
-  const dataView = new DataView(arrayBuffer);
+  const { width, height, scale, data } = payload;
 
-  // Read dimensions (little endian int32)
-  const width = dataView.getInt32(0, true);
-  const height = dataView.getInt32(4, true);
-
-  // Read vector data (little endian float32)
-  const vectorData = new Float32Array(width * height * 2);
-  let offset = 8; // After width and height
-
-  for (let i = 0; i < width * height * 2; i++) {
-    vectorData[i] = dataView.getFloat32(offset, true);
-    offset += 4;
+  // Convert Int16Array to Float32Array with scale factor
+  const floatData = new Float32Array(data.length);
+  for (let i = 0; i < data.length; i++) {
+    floatData[i] = data[i] / scale;
   }
 
-  console.log(`Decoded binary frame: ${width}x${height}, ${vectorData.length} floats`);
+  console.log(`Decoded CBOR frame: ${width}x${height}, scale: ${scale}, ${floatData.length} floats`);
 
   // Debug: log pixel (48, 144)
   const debugIdx = (144 * width + 48) * 2;
-  if (debugIdx < vectorData.length) {
-    console.log(`DECODED BINARY pixel (48,144): vx=${vectorData[debugIdx].toFixed(2)}, vy=${vectorData[debugIdx + 1].toFixed(2)}`);
+  if (debugIdx < floatData.length) {
+    console.log(`DECODED CBOR pixel(48, 144): vx = ${floatData[debugIdx].toFixed(2)}, vy = ${floatData[debugIdx + 1].toFixed(2)}`);
   }
 
-  return { width, height, data: vectorData };
+  return { width, height, data: floatData };
+}
+
+// Decode gzipped CBOR vector frame format
+// The browser automatically decompresses gzipped responses when Content-Encoding: gzip is set
+async function unmarshalVectorFrameOLD(blob: Blob): Promise<Frame> {
+  const arrayBuffer = await blob.arrayBuffer();
+
+  // Parse CBOR data directly from the decompressed buffer
+  const payload = cbor.decode(new Uint8Array(arrayBuffer));
+
+  const { width, height, scale, data } = payload;
+
+  // Convert Int16Array to Float32Array with scale factor
+  const floatData = new Float32Array(data.length);
+  for (let i = 0; i < data.length; i++) {
+    floatData[i] = data[i] / scale;
+  }
+
+  console.log(`Decoded CBOR frame: ${width}x${height}, scale: ${scale}, ${floatData.length} floats`);
+
+  // Debug: log pixel (48, 144)
+  const debugIdx = (144 * width + 48) * 2;
+  if (debugIdx < floatData.length) {
+    console.log(`DECODED CBOR pixel (48,144): vx=${floatData[debugIdx].toFixed(2)}, vy=${floatData[debugIdx + 1].toFixed(2)}`);
+  }
+
+  return { width, height, data: floatData };
 }
 
 // --- Mock Data Generator (For Demo Only) ---
@@ -240,8 +257,8 @@ export default function App() {
       // ---------------------------------------------------------
       const id = "123";
       try {
-        const response = await fetch(`http://localhost:9093/average-flow-grid?id=${id}&t=${timeStep}`);
-        const blob = await response.blob();
+        const response = await fetch(`/flow-2025-11-14.gzip`);
+        const blob = await response.arrayBuffer();
         const frame = await unmarshalVectorFrame(blob);
         if (isMounted) setCurrentFrame(frame);
       } catch (e) {
