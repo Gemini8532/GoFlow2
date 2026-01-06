@@ -49,6 +49,11 @@ func (t *Tracker) AddImage(img gocv.Mat) error {
 		return t.initializeTracks(img)
 	}
 
+	// If we lost all tracks, try to find new features in the current image.
+	if t.prevPoints.Empty() {
+		return t.initializeTracks(img)
+	}
+
 	// Track features from the previous image to the current one.
 	nextPoints := gocv.NewMat()
 	defer nextPoints.Close()
@@ -91,6 +96,7 @@ func (t *Tracker) initializeTracks(img gocv.Mat) error {
 		t.nextTrackID++
 	}
 
+	t.prevImg.Close()
 	t.prevImg = img.Clone()
 	t.prevPoints.Close()
 	t.prevPoints = points.Clone()
